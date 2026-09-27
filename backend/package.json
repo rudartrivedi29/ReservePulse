@@ -1,0 +1,43 @@
+{
+  "name": "reservepulse-backend",
+  "version": "0.1.0",
+  "private": true,
+  "description": "ReservePulse REST API backend service",
+  "main": "dist/server.js",
+  "scripts": {
+    "dev": "tsx watch src/server.ts",
+    "build": "tsc",
+    "start": "node dist/server.js",
+    "typecheck": "tsc --noEmit",
+    "test": "tsx src/scripts/test_production_audit.ts",
+    "test:audit": "tsx src/scripts/test_production_audit.ts",
+    "test:concurrency": "tsx src/scripts/test_booking_concurrency.ts",
+    "test:questions": "tsx src/scripts/test_booking_questions.ts",
+    "test:payment": "tsx src/scripts/test_payment_booking_flow.ts",
+    "test:organiser": "tsx src/scripts/test_organiser_booking_flow.ts",
+    "test:admin": "tsx src/scripts/test_admin_management_flow.ts",
+    "test:analytics": "tsx src/scripts/test_analytics_flow.ts"
+  },
+  "dependencies": {
+    "bcryptjs": "^3.0.3",
+    "cors": "^2.8.5",
+    "dotenv": "^16.4.7",
+    "express": "^4.21.2",
+    "helmet": "^8.0.0",
+    "jsonwebtoken": "^9.0.3",
+    "morgan": "^1.10.0",
+    "pg": "^8.23.0",
+    "zod": "^4.6.5"
+  },
+  "devDependencies": {
+    "@types/bcryptjs": "^2.4.6",
+    "@types/cors": "^2.8.17",
+    "@types/express": "^4.17.21",
+    "@types/jsonwebtoken": "^9.0.10",
+    "@types/morgan": "^1.9.9",
+    "@types/node": "^22.10.7",
+    "@types/pg": "^8.23.1",
+    "tsx": "^4.19.2",
+    "typescript": "^5.7.3"
+  }
+}
