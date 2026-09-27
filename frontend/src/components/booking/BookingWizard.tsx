@@ -21,7 +21,6 @@ import {
   type ServiceQuestionItem,
   type BookingItem,
 } from '../../services/booking.service';
-import { paymentClient } from '../../services/payment.service';
 import type { ResourceItem } from '../../services/resource.service';
 import { ApiError } from '../../services/api';
 import { useAuth } from '../../context/useAuth';
@@ -41,7 +40,6 @@ import {
   Building,
   User,
   ShieldCheck,
-  CreditCard,
   ArrowRight,
   RefreshCw,
 } from 'lucide-react';
@@ -123,36 +121,16 @@ export const BookingWizard: React.FC<BookingWizardProps> = ({
   const [copiedRef, setCopiedRef] = useState(false);
   const [idempotencyKey, setIdempotencyKey] = useState<string>(() => crypto.randomUUID());
 
-  // Payment checkout form state (advance payment)
-  const [cardNumber, setCardNumber] = useState('4242 •••• •••• 4242');
-  const [cardExpiry, setCardExpiry] = useState('12/28');
-  const [cardCvc, setCardCvc] = useState('123');
-  const [cardName, setCardName] = useState('');
-  const [simulateCardDecline, setSimulateCardDecline] = useState(false);
 
-  // Dynamic price calculation
-  const calculatedPrice = useMemo(() => {
-    if (!selectedService) return 0;
-    if (selectedService.paymentSetting === 'free') return 0;
-    if (selectedService.capacityType === 'group') {
-      return selectedService.priceAmount * attendeeCount;
-    }
-    return selectedService.priceAmount;
-  }, [selectedService, attendeeCount]);
 
-  // Determine whether advance payment is required
-  const isAdvancePaymentRequired = useMemo(() => {
-    if (!selectedService) return false;
-    return selectedService.paymentSetting === 'paid' && calculatedPrice > 0;
-  }, [selectedService, calculatedPrice]);
+
 
   // Update user profile fields if user changes or logs in
   useEffect(() => {
     if (user?.name && !customerName) setCustomerName(user.name);
     if (user?.email && !customerEmail) setCustomerEmail(user.email);
     if (user?.phone && !customerPhone) setCustomerPhone(user.phone);
-    if (user?.name && !cardName) setCardName(user.name);
-  }, [user, customerName, customerEmail, customerPhone, cardName]);
+  }, [user, customerName, customerEmail, customerPhone]);
 
   // Load published services
   useEffect(() => {
@@ -445,48 +423,13 @@ export const BookingWizard: React.FC<BookingWizardProps> = ({
       });
 
       if (res.data) {
-        let finalBooking = res.data;
-
-        // If advance payment is required, authorize through provider abstraction
-        if (isAdvancePaymentRequired && res.data.paymentIntent) {
-          try {
-            const payRes = await paymentClient.confirmPayment(res.data.id, {
-              paymentIntentId: res.data.paymentIntent.paymentIntentId,
-              paymentMethod: 'credit_card',
-              simulateFailure: simulateCardDecline,
-              cardDetails: {
-                brand: 'Visa',
-                last4: simulateCardDecline ? '0002' : cardNumber.replace(/\D/g, '').slice(-4) || '4242',
-                expiryMonth: parseInt(cardExpiry.split('/')[0] || '12', 10),
-                expiryYear: 2000 + parseInt(cardExpiry.split('/')[1] || '28', 10),
-              },
-            });
-
-            if (payRes.data?.booking) {
-              finalBooking = payRes.data.booking;
-            }
-          } catch (payErr: any) {
-            if (payErr?.data?.booking) {
-              finalBooking = payErr.data.booking;
-            }
-          }
-        }
-
+        const finalBooking = res.data;
         setCompletedBooking(finalBooking);
 
-        if (finalBooking.status === 'confirmed') {
-          toast.success(
-            'Booking Confirmed!',
-            `Reservation ${finalBooking.bookingReference} has been verified and registered.`
-          );
-        } else if (finalBooking.status === 'payment-failed') {
-          toast.error(
-            'Payment Authorization Failed',
-            'Your card was declined. You can retry payment from the confirmation page.'
-          );
-        } else {
-          toast.success('Reservation Received', `Booking ${finalBooking.bookingReference} registered.`);
-        }
+        toast.success(
+          'Booking Confirmed!',
+          `Reservation ${finalBooking.bookingReference} has been verified and registered.`
+        );
 
         if (onBookingSuccess) {
           onBookingSuccess(finalBooking);
@@ -1185,22 +1128,17 @@ export const BookingWizard: React.FC<BookingWizardProps> = ({
                       </div>
                     </div>
 
-                    {/* Price breakdown notice */}
-                    <div className="p-3.5 rounded-xl bg-indigo-50/70 border border-indigo-100 flex items-center justify-between text-xs">
-                      <div>
-                        <span className="font-semibold text-indigo-950">Calculated Total: </span>
-                        <span className="text-indigo-800">
-                          {calculatedPrice === 0
-                            ? 'Free reservation'
-                            : `${selectedService.priceCurrency} ${calculatedPrice.toFixed(2)}`}
-                        </span>
+                    {/* Direct Booking confirmation notice */}
+                    <div className="p-3.5 rounded-xl bg-emerald-50/70 border border-emerald-100 flex items-center justify-between text-xs">
+                      <div className="flex items-center gap-2">
+                        <CheckCircle2 className="w-4 h-4 text-emerald-600" />
+                        <span className="font-semibold text-emerald-950">Free Direct Booking</span>
                       </div>
-                      <Badge variant="blue">Payment Deferred</Badge>
+                      <Badge variant="emerald">100% Free</Badge>
                     </div>
 
                     <div className="text-[11px] text-slate-500 leading-relaxed">
-                      Payment is deferred per platform milestone. No payment will be collected at this
-                      time. Reservation capacity is guaranteed upon server confirmation.
+                      No payment or credit card is required. Your slot capacity is guaranteed upon reservation confirmation.
                     </div>
                   </div>
                 </div>
@@ -1399,87 +1337,16 @@ export const BookingWizard: React.FC<BookingWizardProps> = ({
                       </div>
 
                       <div className="p-3 rounded-xl bg-slate-50 border border-slate-200 space-y-1">
-                        <span className="text-slate-500 font-medium">Total Ledger Price</span>
-                        <div className="font-bold text-slate-900">
-                          {calculatedPrice === 0
-                            ? 'Free'
-                            : `${selectedService.priceCurrency} ${calculatedPrice.toFixed(2)}`}
+                        <span className="text-slate-500 font-medium">Reservation Fee</span>
+                        <div className="font-bold text-emerald-700 flex items-center gap-1.5">
+                          <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600" />
+                          <span>Free / Direct Booking</span>
                         </div>
-                        <div className={`text-[11px] font-medium ${isAdvancePaymentRequired ? 'text-indigo-600' : 'text-emerald-600'}`}>
-                          {isAdvancePaymentRequired ? 'Advance Payment Required' : 'No Payment Due Today (Free)'}
+                        <div className="text-[11px] text-slate-500 font-medium">
+                          No payment or card required
                         </div>
                       </div>
                     </div>
-
-                    {/* Advance Payment Card Form (Only rendered when service requires advance payment) */}
-                    {isAdvancePaymentRequired && (
-                      <div className="p-4 rounded-2xl bg-gradient-to-br from-indigo-50/90 to-purple-50/70 border border-indigo-200/80 space-y-4">
-                        <div className="flex items-center justify-between pb-2 border-b border-indigo-200/60">
-                          <div className="flex items-center gap-2">
-                            <CreditCard className="w-4 h-4 text-indigo-700" />
-                            <span className="text-xs font-bold text-indigo-950 uppercase tracking-wider">
-                              Payment Authorization
-                            </span>
-                          </div>
-                          <Badge variant="purple" size="xs">
-                            {selectedService.priceCurrency} {calculatedPrice.toFixed(2)} Due Now
-                          </Badge>
-                        </div>
-
-                        <div className="space-y-3">
-                          <Input
-                            label="Cardholder Name"
-                            value={cardName || customerName}
-                            onChange={(e) => setCardName(e.target.value)}
-                            placeholder="Full name as printed on card"
-                          />
-                          <Input
-                            label="Card Number"
-                            value={cardNumber}
-                            onChange={(e) => setCardNumber(e.target.value)}
-                            placeholder="4242 •••• •••• 4242"
-                            helperText="Simulated Gateway: 4242... succeeds; ends in 0002 simulates decline."
-                          />
-                          <div className="grid grid-cols-2 gap-3">
-                            <Input
-                              label="Expires (MM/YY)"
-                              value={cardExpiry}
-                              onChange={(e) => setCardExpiry(e.target.value)}
-                              placeholder="12/28"
-                            />
-                            <Input
-                              label="CVC Security Code"
-                              type="password"
-                              maxLength={4}
-                              value={cardCvc}
-                              onChange={(e) => setCardCvc(e.target.value)}
-                              placeholder="123"
-                            />
-                          </div>
-
-                          {/* Interactive Simulation Switch for Testing Payment Failures */}
-                          <div className="pt-2 flex items-center justify-between text-xs bg-white/80 p-2.5 rounded-xl border border-indigo-200/70">
-                            <span className="font-semibold text-slate-700">Simulate Payment Failure (Testing):</span>
-                            <button
-                              type="button"
-                              onClick={() => setSimulateCardDecline(!simulateCardDecline)}
-                              className={`px-2.5 py-1 rounded-lg text-xs font-bold cursor-pointer transition-colors ${
-                                simulateCardDecline
-                                  ? 'bg-rose-600 text-white'
-                                  : 'bg-slate-200 text-slate-700 hover:bg-slate-300'
-                              }`}
-                            >
-                              {simulateCardDecline ? 'DECLINE ACTIVE' : 'NORMAL SUCCESS'}
-                            </button>
-                          </div>
-
-                          <div className="flex items-center gap-1.5 text-[11px] text-slate-500 pt-1">
-                            <ShieldCheck className="w-3.5 h-3.5 text-emerald-600 shrink-0" />
-                            <span>PCI-DSS Tokenized: Processed safely via payment intent. Raw card data is never stored.</span>
-                          </div>
-                        </div>
-                      </div>
-                    )}
 
                     {/* Answers overview */}
                     {questions.length > 0 && (
@@ -1548,12 +1415,9 @@ export const BookingWizard: React.FC<BookingWizardProps> = ({
                   onClick={handleConfirmReservation}
                   isLoading={isSubmitting}
                   disabled={isSubmitting}
+                  className="bg-emerald-600 hover:bg-emerald-700 text-white font-semibold shadow-md px-6 py-2"
                 >
-                  {isSubmitting
-                    ? 'Authorizing & Confirming...'
-                    : isAdvancePaymentRequired
-                    ? `Pay ${selectedService?.priceCurrency || 'USD'} ${calculatedPrice.toFixed(2)} & Confirm`
-                    : 'Confirm Reservation'}
+                  {isSubmitting ? 'Confirming Reservation...' : 'Confirm Reservation'}
                 </Button>
               )}
             </div>
