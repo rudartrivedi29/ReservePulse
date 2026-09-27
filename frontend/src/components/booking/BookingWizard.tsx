@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo, useCallback } from 'react';
+import React, { useState, useEffect, useMemo, useCallback, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
   Modal,
@@ -96,6 +96,16 @@ export const BookingWizard: React.FC<BookingWizardProps> = ({
 
   // Step 5: Capacity (Attendee Count)
   const [attendeeCount, setAttendeeCount] = useState<number>(1);
+
+  // Synchronization refs to keep callbacks stable and eliminate circular re-render loops
+  const selectedSlotRef = useRef<BookableSlot | null>(selectedSlot);
+  selectedSlotRef.current = selectedSlot;
+
+  const currentStepRef = useRef<number>(currentStep);
+  currentStepRef.current = currentStep;
+
+  const attendeeCountRef = useRef<number>(attendeeCount);
+  attendeeCountRef.current = attendeeCount;
 
   // Step 6: Intake Questions & Customer Info
   const [questions, setQuestions] = useState<ServiceQuestionItem[]>([]);
@@ -224,7 +234,6 @@ export const BookingWizard: React.FC<BookingWizardProps> = ({
       if (!isSilent) {
         setIsLoadingSlots(true);
         setSlotFetchError(null);
-        setSelectedSlot(null);
       } else {
         setIsSilentRefreshing(true);
       }
@@ -236,7 +245,7 @@ export const BookingWizard: React.FC<BookingWizardProps> = ({
           startDate: dateStr,
           endDate: dateStr,
           resourceId: selectedResource?.id,
-          attendees: attendeeCount,
+          attendees: attendeeCountRef.current,
         });
 
         const daySlots =
@@ -244,21 +253,22 @@ export const BookingWizard: React.FC<BookingWizardProps> = ({
         setAvailableSlots(daySlots);
         setLastRefreshedAt(new Date());
 
-        // Stale slot selection check on silent background refresh
-        if (isSilent && selectedSlot) {
+        // Validate or synchronize currently selected slot against fresh slots without wiping
+        const currentSelected = selectedSlotRef.current;
+        if (currentSelected) {
           const matchingSlot = daySlots.find(
             (s) =>
-              s.id === selectedSlot.id ||
-              (s.startDateTime === selectedSlot.startDateTime && s.resourceId === selectedSlot.resourceId)
+              s.id === currentSelected.id ||
+              (s.startDateTime === currentSelected.startDateTime && s.resourceId === currentSelected.resourceId)
           );
 
-          if (!matchingSlot || matchingSlot.remainingCapacity < attendeeCount) {
-            // Stale slot selection detected!
+          if (!matchingSlot || matchingSlot.remainingCapacity < attendeeCountRef.current) {
+            // Stale slot selection detected
             setSelectedSlot(null);
-            const notice = `The slot at ${selectedSlot.startTime} is no longer available. Another customer just reserved it.`;
+            const notice = `The slot at ${currentSelected.startTime} is no longer available. Another customer just reserved it.`;
             setSlotConflictMessage(notice);
             toast.warning('Slot Taken', 'Your selected slot was taken by another user. Schedule refreshed.');
-            if (currentStep > 4) {
+            if (currentStepRef.current > 4) {
               setCurrentStep(4);
             }
           } else {
@@ -280,7 +290,7 @@ export const BookingWizard: React.FC<BookingWizardProps> = ({
         }
       }
     },
-    [selectedService, selectedDate, selectedResource, attendeeCount, selectedSlot, currentStep, toast]
+    [selectedService?.id, selectedDate, selectedResource?.id, toast]
   );
 
   useEffect(() => {
@@ -1081,10 +1091,15 @@ export const BookingWizard: React.FC<BookingWizardProps> = ({
                                   setSelectedSlot(slot);
                                   setSlotConflictMessage(null);
                                 }}
-                                className={`w-full p-3 rounded-xl border text-left flex items-center justify-between transition-all duration-200 ${
+                                onDoubleClick={() => {
+                                  setSelectedSlot(slot);
+                                  setSlotConflictMessage(null);
+                                  setCurrentStep(5);
+                                }}
+                                className={`w-full p-3.5 rounded-xl border text-left flex items-center justify-between transition-all duration-200 cursor-pointer ${
                                   isSelected
-                                    ? 'bg-indigo-50/80 border-indigo-600 text-indigo-950 shadow-sm ring-1 ring-indigo-500'
-                                    : 'bg-slate-50/60 border-slate-200/90 text-slate-800 hover:bg-slate-100 hover:border-slate-300'
+                                    ? 'bg-indigo-50/90 border-indigo-600 text-indigo-950 shadow-md ring-2 ring-indigo-500/50'
+                                    : 'bg-slate-50/70 border-slate-200/90 text-slate-800 hover:bg-slate-100 hover:border-slate-300'
                                 }`}
                               >
                                 <div className="space-y-0.5">
@@ -1092,9 +1107,13 @@ export const BookingWizard: React.FC<BookingWizardProps> = ({
                                     <span>
                                       {slot.startTime} - {slot.endTime}
                                     </span>
-                                    {isSelected && <Badge variant="blue">Selected</Badge>}
+                                    {isSelected && (
+                                      <Badge variant="blue" className="bg-indigo-600 text-white font-semibold">
+                                        ✓ Selected
+                                      </Badge>
+                                    )}
                                   </div>
-                                  <div className="text-[11px] text-slate-500">
+                                  <div className="text-[11px] text-slate-500 font-medium">
                                     {slot.resourceName}
                                   </div>
                                 </div>
