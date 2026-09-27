@@ -1,6 +1,7 @@
 import { Request, Response, NextFunction } from 'express';
 import { PaymentService } from '../services/payment/payment.service';
 import { successResponse } from '../utils/apiResponse';
+import { UnauthorizedError } from '../utils/errors';
 import { ConfirmPaymentPayload } from '../validators/payment.validator';
 
 export class PaymentController {
@@ -78,7 +79,14 @@ export class PaymentController {
   ): Promise<void> {
     try {
       const idOrReference = req.params.idOrReference || req.params.id || req.params.bookingId;
-      const details = await PaymentService.getPaymentDetailsForBooking(idOrReference);
+      if (!req.user && !idOrReference.startsWith('BK-')) {
+        const { BookingService } = await import('../services/booking.service');
+        const b = await BookingService.getBookingByIdOrReference(idOrReference);
+        if (b.customerId) {
+          throw new UnauthorizedError('Authentication required to view payment records for customer bookings');
+        }
+      }
+      const details = await PaymentService.getPaymentDetailsForBooking(idOrReference, req.user);
 
       res.json(
         successResponse(

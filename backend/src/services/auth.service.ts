@@ -17,6 +17,7 @@ import {
   ResetPasswordInput,
 } from '../validators/auth.validator';
 import { AuthUserPayload } from '../middleware/auth.middleware';
+import { generateSecureOtp, timingSafeCompare } from '../utils/security';
 
 export interface UserResponse {
   id: string;
@@ -42,6 +43,7 @@ export interface UserEntity {
   is_verified: boolean;
   otp_code?: string | null;
   otp_expires_at?: Date | null;
+  otp_failed_attempts?: number;
   reset_password_token?: string | null;
   reset_password_expires_at?: Date | null;
   created_at: Date;
@@ -126,10 +128,10 @@ export class AuthService {
   }
 
   /**
-   * Helper: Generate a secure 6-digit numeric OTP code
+   * Helper: Generate a cryptographically secure 6-digit numeric OTP code
    */
   public static generateOtp(): string {
-    return Math.floor(100000 + Math.random() * 900000).toString();
+    return generateSecureOtp();
   }
 
   /**
@@ -283,17 +285,21 @@ export class AuthService {
     const otpCode = this.generateOtp();
     const otpExpiresAt = new Date(Date.now() + config.otp.expiryMinutes * 60 * 1000);
 
+    // Guard: Prevent privilege escalation on public self-registration
+    const assignedRole = (data.role as string) === 'ADMIN' ? 'CUSTOMER' : (data.role || 'CUSTOMER');
+
     const newUser: UserEntity = {
       id: `usr_${crypto.randomUUID()}`,
       email: data.email.toLowerCase().trim(),
       full_name: data.fullName.trim(),
-      role: data.role,
+      role: assignedRole,
       phone: data.phone?.trim(),
       password_hash: passwordHash,
       is_verified: false,
       is_active: true,
       otp_code: otpCode,
       otp_expires_at: otpExpiresAt,
+      otp_failed_attempts: 0,
       created_at: new Date(),
       updated_at: new Date(),
     };
@@ -309,13 +315,13 @@ export class AuthService {
     return {
       user: this.formatUser(newUser),
       token,
-      otp: otpCode, // Provided for developer testing / preview flow
+      otp: config.isDevelopment ? otpCode : undefined as any,
       message: `Account created successfully. A 6-digit OTP code has been generated (Valid for ${config.otp.expiryMinutes} minutes).`,
     };
   }
 
   /**
-   * 2. Verify Account OTP
+   * 2. Verify Account OTP with Timing-Attack & Brute-Force Protection
    */
   public static async verifyOtp(data: VerifyOtpInput): Promise<{
     user: UserResponse;
@@ -336,7 +342,18 @@ export class AuthService {
       };
     }
 
-    if (!user.otp_code || user.otp_code !== data.otp.trim()) {
+    // Rate-limiting check: Invalidate OTP after 5 failed attempts
+    if ((user.otp_failed_attempts || 0) >= 5) {
+      user.otp_code = null;
+      user.otp_expires_at = null;
+      user.otp_failed_attempts = 0;
+      await this.saveUser(user);
+      throw new BadRequestError('Too many failed OTP verification attempts. This code has been invalidated for security. Please request a new code.');
+    }
+
+    if (!user.otp_code || !timingSafeCompare(user.otp_code, data.otp)) {
+      user.otp_failed_attempts = (user.otp_failed_attempts || 0) + 1;
+      await this.saveUser(user);
       throw new BadRequestError('Invalid OTP verification code. Please check and try again.');
     }
 
@@ -348,6 +365,7 @@ export class AuthService {
     user.is_verified = true;
     user.otp_code = null;
     user.otp_expires_at = null;
+    user.otp_failed_attempts = 0;
     user.updated_at = new Date();
 
     await this.saveUser(user);
@@ -449,7 +467,7 @@ export class AuthService {
     }
 
     return {
-      resetToken, // Returned for effortless demo/testing
+      resetToken: config.isDevelopment ? resetToken : (undefined as any),
       message:
         'If an account exists with this email address, a password reset code has been issued (Valid for 15 minutes).',
     };
@@ -468,7 +486,7 @@ export class AuthService {
 
     if (
       !user.reset_password_token ||
-      user.reset_password_token.trim() !== data.token.trim()
+      !timingSafeCompare(user.reset_password_token, data.token)
     ) {
       throw new BadRequestError('Invalid or expired password reset token.');
     }

@@ -2,6 +2,7 @@ import { Request, Response, NextFunction } from 'express';
 import { BookingService } from '../services/booking.service';
 import { QuestionService } from '../services/question.service';
 import { successResponse } from '../utils/apiResponse';
+import { UnauthorizedError } from '../utils/errors';
 import {
   CreateBookingInput,
   CancelBookingInput,
@@ -147,6 +148,11 @@ export class BookingController {
       const idOrReference = req.params.idOrReference || req.params.id || req.params.reference;
       const booking = await BookingService.getBookingByIdOrReference(idOrReference, req.user);
 
+      // Defend against unauthenticated enumeration of customer reservations by internal UUID
+      if (booking.customerId && !req.user && idOrReference !== booking.bookingReference) {
+        throw new UnauthorizedError('Authentication required to access customer reservation details');
+      }
+
       res.json(
         successResponse(
           booking,
@@ -196,6 +202,12 @@ export class BookingController {
     try {
       const idOrReference = req.params.idOrReference || req.params.id || req.params.reference;
       const { reason } = (req.body || {}) as CancelBookingInput;
+
+      // Defend against unauthenticated cancellation of registered customer reservations
+      const existing = await BookingService.getBookingByIdOrReference(idOrReference);
+      if (existing.customerId && !req.user) {
+        throw new UnauthorizedError('Authentication required to cancel a customer account reservation');
+      }
 
       const booking = await BookingService.cancelBooking(idOrReference, reason, req.user);
 

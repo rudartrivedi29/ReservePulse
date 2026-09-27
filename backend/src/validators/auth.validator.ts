@@ -1,6 +1,7 @@
 import { z } from 'zod';
 
 export const userRoleEnum = z.enum(['CUSTOMER', 'ORGANISER', 'ADMIN', 'customer', 'organiser', 'admin']);
+export const publicSignupRoleEnum = z.enum(['CUSTOMER', 'ORGANISER', 'customer', 'organiser']);
 
 export const signupSchema = z.object({
   email: z
@@ -17,7 +18,7 @@ export const signupSchema = z.object({
     .trim()
     .min(2, 'Full name must be at least 2 characters')
     .max(100, 'Full name cannot exceed 100 characters'),
-  role: userRoleEnum.default('CUSTOMER').transform((val) => val.toUpperCase() as 'CUSTOMER' | 'ORGANISER' | 'ADMIN'),
+  role: publicSignupRoleEnum.default('CUSTOMER').transform((val) => val.toUpperCase() as 'CUSTOMER' | 'ORGANISER'),
   phone: z.string().trim().optional(),
 });
 

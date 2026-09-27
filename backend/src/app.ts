@@ -4,10 +4,14 @@ import helmet from 'helmet';
 import { config } from './config/env';
 import { requestIdMiddleware, requestLogger } from './middleware/requestLogger.middleware';
 import { errorHandler, notFoundHandler } from './middleware/error.middleware';
+import { apiRateLimiter } from './middleware/rateLimiter.middleware';
 import { apiRouter } from './routes';
 
 export const createApp = (): Application => {
   const app = express();
+
+  // Hide server fingerprint
+  app.disable('x-powered-by');
 
   // Security headers
   app.use(helmet());
@@ -48,8 +52,8 @@ export const createApp = (): Application => {
     });
   });
 
-  // Mount API v1 routes
-  app.use('/api/v1', apiRouter);
+  // Mount API v1 routes with rate limiting protection
+  app.use('/api/v1', apiRateLimiter, apiRouter);
 
   // 404 Catch-all handler
   app.use(notFoundHandler);

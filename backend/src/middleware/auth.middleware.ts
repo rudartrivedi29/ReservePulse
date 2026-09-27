@@ -32,7 +32,7 @@ export const authenticate = (req: Request, res: Response, next: NextFunction): v
   const token = authHeader.split(' ')[1];
 
   try {
-    const decoded = jwt.verify(token, config.jwt.secret) as AuthUserPayload;
+    const decoded = jwt.verify(token, config.jwt.secret, { algorithms: ['HS256'] }) as AuthUserPayload;
     req.user = decoded;
     next();
   } catch (err) {
@@ -54,7 +54,7 @@ export const optionalAuthenticate = (req: Request, res: Response, next: NextFunc
 
   const token = authHeader.split(' ')[1];
   try {
-    const decoded = jwt.verify(token, config.jwt.secret) as AuthUserPayload;
+    const decoded = jwt.verify(token, config.jwt.secret, { algorithms: ['HS256'] }) as AuthUserPayload;
     req.user = decoded;
   } catch {
     // Silently ignore invalid token for optional auth

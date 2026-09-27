@@ -114,11 +114,16 @@ export const errorHandler = (
     });
   }
 
+  const isDbLeakRisk = ['DATABASE_ERROR', 'UNIQUE_VIOLATION', 'FOREIGN_KEY_VIOLATION', 'CHECK_VIOLATION'].includes(errorCode);
+  const safeDetails = config.isDevelopment
+    ? details || { stack: err.stack }
+    : (isDbLeakRisk ? undefined : details);
+
   res.status(statusCode).json(
     errorResponse(
       message,
       errorCode,
-      config.isDevelopment ? details || { stack: err.stack } : details
+      safeDetails
     )
   );
 };

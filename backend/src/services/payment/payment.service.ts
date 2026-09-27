@@ -1,7 +1,7 @@
 import crypto from 'crypto';
 import { db } from '../../config/database';
 import { logger } from '../../utils/logger';
-import { NotFoundError, BadRequestError } from '../../utils/errors';
+import { NotFoundError, BadRequestError, ForbiddenError } from '../../utils/errors';
 import { AuthUserPayload } from '../../middleware/auth.middleware';
 import {
   BookingEntity,
@@ -126,6 +126,13 @@ export class PaymentService {
       throw new BadRequestError('Booking has already been paid and confirmed');
     }
 
+    // Role & Ownership check for authenticated customers
+    if (authUser && (authUser.role || '').toUpperCase() === 'CUSTOMER') {
+      if (booking.customerId && booking.customerId !== authUser.id) {
+        throw new ForbiddenError('Access denied: You can only create payment intents for your own reservations');
+      }
+    }
+
     // Lookup service to check advance payment configuration
     const service = await ServiceService.getServiceById(booking.serviceId);
     const required = this.isAdvancePaymentRequired(
@@ -208,6 +215,13 @@ export class PaymentService {
 
     if (booking.status === 'cancelled') {
       throw new BadRequestError('Cannot process payment for a cancelled booking');
+    }
+
+    // Role & Ownership check for authenticated customers
+    if (authUser && (authUser.role || '').toUpperCase() === 'CUSTOMER') {
+      if (booking.customerId && booking.customerId !== authUser.id) {
+        throw new ForbiddenError('Access denied: You can only process payment for your own reservation');
+      }
     }
 
     const provider = PaymentProviderRegistry.getProvider();
@@ -321,7 +335,8 @@ export class PaymentService {
    * Retrieve payment history and active intent for a booking
    */
   public static async getPaymentDetailsForBooking(
-    bookingId: string
+    bookingId: string,
+    authUser?: AuthUserPayload
   ): Promise<{
     payments: PaymentRecordEntity[];
     paymentSummary?: PaymentSummaryResponse;
@@ -332,6 +347,14 @@ export class PaymentService {
       const { BookingService } = await import('../booking.service');
       const b = await BookingService.getBookingByIdOrReference(bookingId);
       resolvedId = b.id;
+    }
+
+    if (authUser && (authUser.role || '').toUpperCase() === 'CUSTOMER') {
+      const { BookingService } = await import('../booking.service');
+      const b = await BookingService.getBookingByIdOrReference(resolvedId);
+      if (b.customerId && b.customerId !== authUser.id) {
+        throw new ForbiddenError('Access denied: You can only view payment details for your own reservations');
+      }
     }
 
     let payments: PaymentRecordEntity[] = [];
