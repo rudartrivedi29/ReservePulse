@@ -84,7 +84,39 @@
 
 ---
 
-## 📊 3. Executive Telemetry & Fleet Operations Dashboard Wireframe
+## 🗂️ 3. Service Catalog & Service Builder Modal Wireframe
+
+![Service Catalog & Creation Modal Wireframe](./wireframes/service_catalog_wireframe.jpg)
+
+### Features & Layout:
+- **Category Filter Tabs**: `All`, `Workspace`, `Compute`, `Consultation`, `Hardware`, `Research`.
+- **Service Cards**:
+  - Duration pill (`60m`, `90m`, `120m`).
+  - Capacity indicator (`up to 8 people`).
+  - Price badge (`$120/hr` or `Free`).
+  - Solid emerald **"Book Now"** action.
+- **Service Builder Modal Overlay**:
+  - Inputs for `Service Name`, `Category`, `Duration Slider` (15m to 240m), `Before/After Buffer Times` (0m to 60m), and `Intake Questionnaire Builder`.
+
+---
+
+## 🏢 4. Resource Fleet Inventory & Weekly Operating Shifts Wireframe
+
+![Resource Fleet & Schedule Planner Wireframe](./wireframes/resource_schedule_wireframe.jpg)
+
+### Features & Layout:
+- **Left Column (Resource Fleet Inventory)**:
+  - Inventory items: `Executive Boardroom Alpha` (Room), `GPU Node Cluster (8x H100)` (Compute), `Private Advisory Pod` (Pod).
+  - Live operational status badges (`Available`, `In Use`, `Under Maintenance`).
+- **Right Column (Weekly Schedule Planner)**:
+  - Shift time-blocks from Monday to Friday (`09:00 AM - 05:00 PM`).
+  - **Split-Shift Interval Toggles**: Toggle afternoon breaks (e.g. 1:00 PM – 2:00 PM).
+  - **Buffer Configurations**: Pre-booking buffer (15 mins), post-booking buffer (30 mins).
+  - **Restrictions**: Minimum lead time (4 hrs), maximum booking horizon (90 days).
+
+---
+
+## 📊 5. Executive Telemetry & Fleet Operations Dashboard Wireframe
 
 ![Analytics & Resource Dashboard Wireframe](./wireframes/analytics_dashboard_wireframe.jpg)
 
@@ -100,6 +132,23 @@
    - 24-hour histogram visualizing load concentration (busiest window: 02:00 PM – 04:00 PM).
 4. **Live Resource Fleet Status (Right)**:
    - Real-time status list (`Operational`, `Maintenance`, `In Use`) with utilization percentages.
+
+---
+
+## 🛡️ 6. Platform Administration & User Governance Console Wireframe
+
+![Platform Administration & User Governance Wireframe](./wireframes/admin_governance_wireframe.jpg)
+
+### Features & Layout:
+- **Top Admin Telemetry Bar**: Active users (`12,485`), Active projects (`1,842`), Audit logs (`97.3K`).
+- **Search & Role Filter Bar**: Filter by `Customer`, `Organiser`, `Admin`.
+- **Data Table**:
+  - User name with avatar and email.
+  - Role pill (`ADMIN` in dark, `ORGANIZER` in blue/teal, `CUSTOMER` in gray/emerald).
+  - Interactive **Active / Inactive Status Toggle**.
+  - Row actions: `Edit`, `Reset Password`, `More...`.
+- **Live System Audit Logs (Bottom Panel)**:
+  - Timestamped events: `User Update`, `Role Created`, `Login Success`, `Booking Confirmed`.
 
 ---
 
