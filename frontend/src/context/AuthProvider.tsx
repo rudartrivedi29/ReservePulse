@@ -9,6 +9,7 @@ import {
   type AuthSessionData,
   type AuthUser,
 } from '../services/auth.service';
+import { setCookie, getCookie, deleteCookie } from '../utils/cookieDb';
 
 const defaultAvatars: Record<AppRole, string> = {
   public: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=120&auto=format&fit=crop&q=80',
@@ -79,11 +80,13 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const [token, setToken] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState<boolean>(true);
 
-  // Initialize session from localStorage on app start
+  // Initialize session from Cookies and LocalStorage on app start
   useEffect(() => {
     const initAuth = async () => {
-      const storedToken = localStorage.getItem('reservepulse_token');
-      const storedUser = localStorage.getItem('reservepulse_user');
+      const cookieToken = getCookie('rp_auth_token');
+      const cookieUser = getCookie('rp_auth_user');
+      const storedToken = cookieToken || localStorage.getItem('reservepulse_token');
+      const storedUser = cookieUser || localStorage.getItem('reservepulse_user');
 
       if (storedToken && storedUser) {
         try {
@@ -92,16 +95,20 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
           setUser(parsedUser);
           setRole(parsedUser.role);
 
-          // Verify token validity with backend
+          // Verify or refresh token validity with local auth service
           const res = await authService.getMe();
           if (res.data) {
             const profile = mapAuthUserToProfile(res.data);
             setUser(profile);
             setRole(profile.role);
+            setCookie('rp_auth_user', JSON.stringify(profile), 30);
             localStorage.setItem('reservepulse_user', JSON.stringify(profile));
           }
         } catch {
           // Token expired or invalid
+          deleteCookie('rp_auth_token');
+          deleteCookie('rp_auth_user');
+          deleteCookie('rp_user_role');
           localStorage.removeItem('reservepulse_token');
           localStorage.removeItem('reservepulse_user');
           setToken(null);
@@ -120,6 +127,15 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     setToken(session.token);
     setUser(profile);
     setRole(profile.role);
+
+    // Save to browser Cookies
+    setCookie('rp_auth_token', session.token, 30);
+    setCookie('rp_auth_user', JSON.stringify(profile), 30);
+    setCookie('rp_user_role', profile.role, 30);
+    setCookie('rp_user_email', profile.email, 30);
+    setCookie('rp_user_name', profile.name, 30);
+
+    // Mirror to LocalStorage
     localStorage.setItem('reservepulse_token', session.token);
     localStorage.setItem('reservepulse_user', JSON.stringify(profile));
   };
@@ -152,6 +168,11 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   }, []);
 
   const logout = useCallback(() => {
+    deleteCookie('rp_auth_token');
+    deleteCookie('rp_auth_user');
+    deleteCookie('rp_user_role');
+    deleteCookie('rp_user_email');
+    deleteCookie('rp_user_name');
     localStorage.removeItem('reservepulse_token');
     localStorage.removeItem('reservepulse_user');
     setToken(null);
@@ -159,11 +180,11 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     setRole('public');
   }, []);
 
-const demoCredentials: Record<'customer' | 'organiser' | 'admin', LoginPayload> = {
-  admin: { email: 'admin@reservepulse.com', password: 'Admin@123' },
-  organiser: { email: 'organiser@reservepulse.com', password: 'Organiser@123' },
-  customer: { email: 'customer@reservepulse.com', password: 'Customer@123' },
-};
+  const demoCredentials: Record<'customer' | 'organiser' | 'admin', LoginPayload> = {
+    admin: { email: 'admin@reservepulse.com', password: 'Admin@123' },
+    organiser: { email: 'organiser@reservepulse.com', password: 'Organiser@123' },
+    customer: { email: 'customer@reservepulse.com', password: 'Customer@123' },
+  };
 
   const switchRole = useCallback(
     async (newRole: AppRole) => {
@@ -181,7 +202,7 @@ const demoCredentials: Record<'customer' | 'organiser' | 'admin', LoginPayload> 
             return;
           }
         } catch (err) {
-          console.warn('Backend login for switchRole failed, falling back to mock user', err);
+          console.warn('Switch role fallback', err);
         }
       }
 

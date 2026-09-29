@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { useNavigate, useLocation, Link } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
 import { useToast } from '../../components/ui/ToastContext';
+import { cookieDb } from '../../utils/cookieDb';
 import {
   Card,
   CardHeader,
@@ -11,8 +12,51 @@ import {
   CardFooter,
   Button,
   Input,
-  Badge,
 } from '../../components/ui';
+
+interface DemoAccount {
+  role: 'customer' | 'organiser' | 'admin';
+  title: string;
+  name: string;
+  email: string;
+  pass: string;
+  tag: string;
+  color: 'emerald' | 'teal' | 'purple';
+  description: string;
+}
+
+const DEMO_ACCOUNTS: DemoAccount[] = [
+  {
+    role: 'customer',
+    title: 'Customer',
+    name: 'Alex Morgan',
+    email: 'customer@reservepulse.com',
+    pass: 'Customer@123',
+    tag: 'Client Portal',
+    color: 'emerald',
+    description: 'Browse services, reserve time slots, intake forms & live tracking',
+  },
+  {
+    role: 'organiser',
+    title: 'Organiser',
+    name: 'Jordan Vance',
+    email: 'organiser@reservepulse.com',
+    pass: 'Organiser@123',
+    tag: 'Operations',
+    color: 'teal',
+    description: 'Publish services, configure resources, shifts & manage bookings',
+  },
+  {
+    role: 'admin',
+    title: 'Administrator',
+    name: 'Morgan Reed',
+    email: 'admin@reservepulse.com',
+    pass: 'Admin@123',
+    tag: 'Full Access',
+    color: 'purple',
+    description: 'Platform telemetry, user administration, system audit logs & KPIs',
+  },
+];
 
 export const LoginPage: React.FC = () => {
   const { login } = useAuth();
@@ -23,6 +67,7 @@ export const LoginPage: React.FC = () => {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [autofillSuccess, setAutofillSuccess] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
 
   // Extract return redirect if present
@@ -69,34 +114,48 @@ export const LoginPage: React.FC = () => {
     }
   };
 
-  const handleQuickDemo = async (demoEmail: string, demoPass: string) => {
-    setEmail(demoEmail);
-    setPassword(demoPass);
+  const handleAutofill = (acc: DemoAccount) => {
+    setEmail(acc.email);
+    setPassword(acc.pass);
+    setError(null);
+    setAutofillSuccess(acc.role);
+    toast.info('Credentials Autofilled', `Ready to sign in as ${acc.name} (${acc.title})`);
+    setTimeout(() => setAutofillSuccess(null), 3000);
+  };
+
+  const handleInstantLogin = async (acc: DemoAccount) => {
+    setEmail(acc.email);
+    setPassword(acc.pass);
     setError(null);
     setIsSubmitting(true);
 
     try {
-      const session = await login({ email: demoEmail, password: demoPass });
+      const session = await login({ email: acc.email, password: acc.pass });
       toast.success(
-        'Demo Login Successful!',
+        'Instant Login Successful!',
         `Authenticated as ${session.user.fullName} (${session.user.role})`
       );
       const target = redirectPath || getDashboardPath(session.user.role);
       navigate(target, { replace: true });
     } catch (err: unknown) {
-      const msg = err instanceof Error ? err.message : 'Demo login failed.';
+      const msg = err instanceof Error ? err.message : 'Instant login failed.';
       setError(msg);
     } finally {
       setIsSubmitting(false);
     }
   };
 
+  const handleResetData = () => {
+    cookieDb.resetToDefaults();
+    toast.success('Database Reset', 'Sample data, services, and bookings have been restored to defaults in browser cookies.');
+  };
+
   return (
-    <div className="min-h-[80vh] flex items-center justify-center py-12 px-4 sm:px-6 lg:px-8 font-sans">
-      <div className="max-w-md w-full space-y-6">
+    <div className="min-h-[85vh] flex items-center justify-center py-10 px-4 sm:px-6 lg:px-8 font-sans">
+      <div className="max-w-xl w-full space-y-5">
         {/* Brand header */}
         <div className="text-center">
-          <Link to="/" className="inline-flex items-center gap-2.5 mb-3 group">
+          <Link to="/" className="inline-flex items-center gap-2.5 mb-2 group">
             <div className="w-10 h-10 rounded-xl bg-gradient-to-tr from-emerald-600 to-teal-500 flex items-center justify-center text-white shadow-lg shadow-emerald-500/20 group-hover:scale-105 transition-transform">
               <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                 <path
@@ -111,17 +170,118 @@ export const LoginPage: React.FC = () => {
               Reserve<span className="text-emerald-600">Pulse</span>
             </span>
           </Link>
-          <h2 className="text-xl font-bold text-slate-800">Sign in to your account</h2>
+          <h2 className="text-xl font-bold text-slate-800">Sign in to test platform features</h2>
           <p className="mt-1 text-xs text-slate-500">
-            Access your bookings, availability and resource schedule
+            Select a dummy role below for instant autofill or test custom credentials.
           </p>
         </div>
 
-        {/* Login Card */}
+        {/* Demo Roles & Autofill Showcase */}
+        <div className="bg-gradient-to-br from-slate-900 via-slate-850 to-slate-900 rounded-2xl p-4 text-white shadow-xl border border-slate-700/60">
+          <div className="flex items-center justify-between mb-3 pb-2.5 border-b border-slate-700/60">
+            <div className="flex items-center gap-2">
+              <span className="flex h-2.5 w-2.5 relative">
+                <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
+                <span className="relative inline-flex rounded-full h-2.5 w-2.5 bg-emerald-500"></span>
+              </span>
+              <span className="text-xs font-bold uppercase tracking-wider text-slate-200">
+                1-Click Testing Credentials &amp; Autofill
+              </span>
+            </div>
+            <span className="text-[11px] text-emerald-400 font-medium px-2 py-0.5 rounded-full bg-emerald-500/10 border border-emerald-500/30">
+              🍪 Cookie DB Active
+            </span>
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-2.5">
+            {DEMO_ACCOUNTS.map((acc) => {
+              const isSelected = autofillSuccess === acc.role;
+              return (
+                <div
+                  key={acc.role}
+                  className={`rounded-xl p-3 border transition-all flex flex-col justify-between ${
+                    isSelected
+                      ? 'border-emerald-400 bg-emerald-950/40 ring-2 ring-emerald-400/30'
+                      : 'border-slate-700/80 bg-slate-800/60 hover:border-slate-500'
+                  }`}
+                >
+                  <div>
+                    <div className="flex items-center justify-between gap-1 mb-1">
+                      <span className="font-bold text-sm text-slate-100 flex items-center gap-1.5">
+                        <span
+                          className={`w-2 h-2 rounded-full ${
+                            acc.color === 'emerald'
+                              ? 'bg-emerald-400'
+                              : acc.color === 'teal'
+                              ? 'bg-teal-400'
+                              : 'bg-purple-400'
+                          }`}
+                        />
+                        {acc.title}
+                      </span>
+                      <span className="text-[10px] text-slate-400 bg-slate-700/50 px-1.5 py-0.5 rounded">
+                        {acc.tag}
+                      </span>
+                    </div>
+
+                    <div className="text-xs font-medium text-slate-300 truncate">{acc.name}</div>
+                    <div className="text-[11px] text-slate-400 font-mono truncate">{acc.email}</div>
+                    <p className="text-[10px] text-slate-400 mt-1 line-clamp-2 leading-relaxed">
+                      {acc.description}
+                    </p>
+                  </div>
+
+                  <div className="mt-3 pt-2 border-t border-slate-700/50 grid grid-cols-2 gap-1.5">
+                    <button
+                      type="button"
+                      onClick={() => handleAutofill(acc)}
+                      disabled={isSubmitting}
+                      className="px-2 py-1.5 text-[11px] font-semibold rounded-lg bg-slate-700 hover:bg-slate-600 active:scale-95 text-slate-200 transition-all cursor-pointer text-center"
+                      title="Fill into login form"
+                    >
+                      Fill Form
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => handleInstantLogin(acc)}
+                      disabled={isSubmitting}
+                      className={`px-2 py-1.5 text-[11px] font-bold rounded-lg text-white active:scale-95 transition-all cursor-pointer text-center ${
+                        acc.color === 'emerald'
+                          ? 'bg-emerald-600 hover:bg-emerald-500'
+                          : acc.color === 'teal'
+                          ? 'bg-teal-600 hover:bg-teal-500'
+                          : 'bg-purple-600 hover:bg-purple-500'
+                      }`}
+                      title="Instant 1-Click login"
+                    >
+                      Login →
+                    </button>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+
+          {/* Database Persistence Notice */}
+          <div className="mt-3 pt-2 border-t border-slate-800 flex items-center justify-between text-[11px] text-slate-400">
+            <span>💾 Data, bookings &amp; services persist in browser Cookies.</span>
+            <button
+              type="button"
+              onClick={handleResetData}
+              className="text-emerald-400 hover:text-emerald-300 underline cursor-pointer"
+            >
+              Reset Sample Data
+            </button>
+          </div>
+        </div>
+
+        {/* Login Card Form */}
         <Card variant="glass" className="shadow-xl border-slate-200/90 backdrop-blur-xl">
           <CardHeader>
-            <CardTitle>Welcome back</CardTitle>
-            <CardDescription>Enter your credentials to enter your dashboard</CardDescription>
+            <CardTitle>Sign in with credentials</CardTitle>
+            <CardDescription>
+              Submit the form below (autofilled or type any email/password to test)
+            </CardDescription>
           </CardHeader>
 
           <CardContent>
@@ -148,12 +308,9 @@ export const LoginPage: React.FC = () => {
               <div className="space-y-1">
                 <div className="flex items-center justify-between">
                   <label className="text-xs font-semibold text-slate-700">Password</label>
-                  <Link
-                    to="/forgot-password"
-                    className="text-xs font-medium text-emerald-600 hover:text-emerald-700 hover:underline"
-                  >
-                    Forgot password?
-                  </Link>
+                  <span className="text-[11px] text-slate-400">
+                    (Default: <code className="bg-slate-100 px-1 py-0.5 rounded text-slate-700">Role@123</code>)
+                  </span>
                 </div>
                 <Input
                   type="password"
@@ -173,68 +330,21 @@ export const LoginPage: React.FC = () => {
                 isLoading={isSubmitting}
                 disabled={isSubmitting}
               >
-                Sign In
+                Sign In to Platform
               </Button>
             </form>
           </CardContent>
 
-          {/* Quick Demo Credentials */}
-          <CardFooter className="flex-col items-start gap-3 bg-slate-50/50 border-t border-slate-100 p-4">
-            <div className="w-full">
-              <div className="flex items-center justify-between mb-2">
-                <span className="text-[11px] font-bold text-slate-400 uppercase tracking-wider">
-                  Instant Demo Accounts:
-                </span>
-                <Badge variant="emerald" size="xs">
-                  1-Click Fill
-                </Badge>
-              </div>
-
-              <div className="grid grid-cols-3 gap-2 w-full">
-                <button
-                  type="button"
-                  onClick={() => handleQuickDemo('customer@reservepulse.com', 'Customer@123')}
-                  className="px-2.5 py-2 text-left rounded-lg border border-slate-200 bg-white hover:border-emerald-500 hover:bg-emerald-50/40 transition-all text-xs group cursor-pointer"
-                >
-                  <div className="font-semibold text-slate-800 group-hover:text-emerald-700 flex items-center gap-1">
-                    <span className="w-1.5 h-1.5 rounded-full bg-emerald-500"></span>
-                    Customer
-                  </div>
-                  <div className="text-[10px] text-slate-400 truncate">Alex Morgan</div>
-                </button>
-
-                <button
-                  type="button"
-                  onClick={() => handleQuickDemo('organiser@reservepulse.com', 'Organiser@123')}
-                  className="px-2.5 py-2 text-left rounded-lg border border-slate-200 bg-white hover:border-teal-500 hover:bg-teal-50/40 transition-all text-xs group cursor-pointer"
-                >
-                  <div className="font-semibold text-slate-800 group-hover:text-teal-700 flex items-center gap-1">
-                    <span className="w-1.5 h-1.5 rounded-full bg-teal-500"></span>
-                    Organiser
-                  </div>
-                  <div className="text-[10px] text-slate-400 truncate">Jordan Vance</div>
-                </button>
-
-                <button
-                  type="button"
-                  onClick={() => handleQuickDemo('admin@reservepulse.com', 'Admin@123')}
-                  className="px-2.5 py-2 text-left rounded-lg border border-slate-200 bg-white hover:border-purple-500 hover:bg-purple-50/40 transition-all text-xs group cursor-pointer"
-                >
-                  <div className="font-semibold text-slate-800 group-hover:text-purple-700 flex items-center gap-1">
-                    <span className="w-1.5 h-1.5 rounded-full bg-purple-500"></span>
-                    Admin
-                  </div>
-                  <div className="text-[10px] text-slate-400 truncate">Morgan Reed</div>
-                </button>
-              </div>
-            </div>
-
-            <div className="w-full text-center pt-2 border-t border-slate-100 text-xs text-slate-500">
+          <CardFooter className="flex items-center justify-between bg-slate-50/50 border-t border-slate-100 p-4 text-xs text-slate-500">
+            <div>
               Don't have an account?{' '}
               <Link to="/signup" className="font-bold text-emerald-600 hover:text-emerald-700 hover:underline">
                 Create one now
               </Link>
             </div>
+            <Link to="/" className="text-slate-500 hover:text-slate-800">
+              ← Back to Catalog
+            </Link>
           </CardFooter>
         </Card>
       </div>
