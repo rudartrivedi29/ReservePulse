@@ -1,406 +1,418 @@
 # ReservePulse
 
-> **High-Performance Multi-Tier Reservation & Resource Orchestration Platform**  
-> Enterprise-grade scheduling, ACID-compliant concurrency, configurable intake forms, resilient payment state machines, and real-time operational analytics.
+<div align="center">
+
+![ReservePulse Banner](https://images.unsplash.com/photo-1517245386807-bb43f82c33c4?w=1200&auto=format&fit=crop&q=80)
+
+### Resilient Multi-Tier Reservation & Resource Orchestration Platform
+*Enterprise scheduling, ACID-compliant concurrency, real-time availability calculation, configurable intake forms, and zero-backend client-side cookie database persistence.*
+
+[![Vite](https://img.shields.io/badge/Vite-8.3-646CFF?logo=vite&logoColor=white)](https://vitejs.dev/)
+[![React](https://img.shields.io/badge/React-19.2-61DAFB?logo=react&logoColor=black)](https://react.dev/)
+[![TypeScript](https://img.shields.io/badge/TypeScript-5.7-3178C6?logo=typescript&logoColor=white)](https://www.typescriptlang.org/)
+[![Node.js](https://img.shields.io/badge/Node.js-22.x-339933?logo=nodedotjs&logoColor=white)](https://nodejs.org/)
+[![PostgreSQL](https://img.shields.io/badge/PostgreSQL-16-4169E1?logo=postgresql&logoColor=white)](https://www.postgresql.org/)
+[![Tailwind CSS](https://img.shields.io/badge/TailwindCSS-4.3-06B6D4?logo=tailwindcss&logoColor=white)](https://tailwindcss.com/)
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
+
+</div>
 
 ---
 
-## 🏗️ System Architecture
+## 📌 Table of Contents
+1. [The Problem Statement](#-the-problem-statement)
+2. [The Solution: ReservePulse](#-the-solution-reservepulse)
+3. [System Architecture & Data Flow](#-system-architecture--data-flow)
+4. [Engineering Flowcharts](#-engineering-flowcharts)
+   - [ACID Concurrency & Double-Booking Prevention](#1-acid-concurrency--double-booking-prevention-flow)
+   - [Dynamic Availability Engine Flow](#2-dynamic-availability-engine-flow)
+   - [Role-Based Access Control (RBAC) Hierarchy](#3-role-based-access-control-rbac-hierarchy)
+5. [Deep Feature Breakdown](#-deep-feature-breakdown)
+   - [Dual-Mode Architecture & Cookie Database Engine](#1-dual-mode-architecture--cookie-database-engine)
+   - [Real-Time Slot Availability & Collision Engine](#2-real-time-slot-availability--collision-engine)
+   - [Configurable Intake Questionnaires](#3-configurable-intake-questionnaires)
+   - [Resilient State Machine & PCI-Compliant Abstraction](#4-resilient-state-machine--pci-compliant-abstraction)
+   - [Operational Telemetry & Real-Time Analytics](#5-operational-telemetry--real-time-analytics)
+   - [Enterprise Admin Governance & Audit Logging](#6-enterprise-admin-governance--audit-logging)
+6. [Interactive Demo Accounts & Testing Sandbox](#-interactive-demo-accounts--testing-sandbox)
+7. [Directory Structure](#-directory-structure)
+8. [Getting Started & Local Development](#-getting-started--local-development)
+9. [Deployment Guide (Vercel & Cloud Hosting)](#-deployment-guide-vercel--cloud-hosting)
 
-ReservePulse is built on a clean, decoupled **Frontend / Backend / Database** tiered architecture designed for enterprise scalability, zero downtime, and strict separation of concerns.
+---
 
+## ⚠️ The Problem Statement
+
+Traditional reservation and appointment systems collapse under high concurrency and complex resource constraints. Across modern platforms, five recurring architecture failures undermine operational integrity:
+
+1. **The Double-Booking Race Condition**: High-demand slots (e.g., meeting rooms, GPU compute slices, medical consultations) receive concurrent HTTP requests within milliseconds. Naive `SELECT` followed by `UPDATE` queries suffer from race windows where two requests read capacity as available and both write bookings, resulting in catastrophic over-allocation.
+2. **State Fragmentation & Zombie Locks**: When a booking or payment workflow drops mid-stream (network drops, abandoned tabs), slots frequently remain locked in limbo, artificially depleting bookable inventory.
+3. **Rigid Intake Schemas**: Most scheduling tools force fixed form fields. When organizers need dynamic, per-service questions (e.g., NDA sign-offs, PyTorch framework tags, catering dietary choices), developers are forced to write bespoke database schema migrations.
+4. **Brittle Availability Mathematics**: Calculating availability requires factoring in operating windows, split shifts, variable buffer times before and after appointments, minimum advance notice, and maximum forward scheduling horizons. Naive date math leads to time-drift bugs and timezone discrepancies.
+5. **Deployment & Evaluation Friction**: Reviewers, testers, and recruiters often cannot preview a full-stack booking system without spinning up external cloud databases, running SQL migrations, and configuring environment secrets.
+
+---
+
+## 💡 The Solution: ReservePulse
+
+ReservePulse is an enterprise-grade reservation and resource orchestration platform engineered from the ground up to solve concurrency, schema rigidity, and operational friction:
+
+- **ACID-Compliant Concurrency**: Uses PostgreSQL transactional row-level locks (`SELECT ... FOR UPDATE`) to guarantee that concurrent booking attempts for the same resource slot are processed serially. Exactly one request succeeds while competing bursts receive an immediate `409 Conflict` with clear recovery guidance.
+- **Dual-Mode Deployment Engine**:
+  - **Production Mode**: Full-stack Node.js/Express + PostgreSQL with connection pooling and raw SQL migrations.
+  - **Zero-Backend Standalone Mode**: An in-browser **Cookie & LocalStorage Database Engine** with a transparent client-side mock router. This enables 100% of the platform (bookings, catalog management, intake questions, admin governance, and telemetry) to run directly on **Vercel** with zero external database dependencies!
+- **Dynamic Real-Time Slot Engine**: Evaluates weekly resource schedules, split shifts, custom before/after buffer intervals, minimum lead times, and active capacity dynamically.
+- **Configurable Intake Forms**: Organisers can create custom questionnaires (text, textarea, select, checkbox, radio) on a per-service basis. Responses are validated and immutably archived with the booking ledger.
+- **Role-Based Access Control (RBAC)**: Fine-grained segmentation across **Customer**, **Organiser**, and **Platform Administrator** tiers, complemented by a 1-click testing sandbox and autofill credentials system.
+
+---
+
+## 🏗️ System Architecture & Data Flow
+
+```mermaid
+graph TD
+    subgraph Client["Frontend SPA (React 19 + TypeScript + Vite)"]
+        UI["UI Layer (Tailwind CSS 4.0 + Glassmorphism)"]
+        Context["Global State (AuthProvider + ToastContext)"]
+        Services["Typed Service Clients (apiClient)"]
+    end
+
+    subgraph DataEngine["Client-Side Persistence Layer (Vercel Mode)"]
+        MockRouter["Transparent Mock Router"]
+        CookieDB["Cookie & LocalStorage DB Engine"]
+        Cookies[("Browser Cookies\n(Session, Role, Summaries)")]
+        LocalStorage[("LocalStorage\n(Complete JSON Snapshot)")]
+    end
+
+    subgraph ProductionBackend["Production REST API (Node.js + Express)"]
+        Gateway["Express API Gateway (/api/v1)"]
+        RateLimit["Rate Limiting & Helmet Middleware"]
+        AuthMiddleware["JWT Authentication & RBAC Guards"]
+        Controllers["Controllers (Booking, Service, Admin, Analytics)"]
+        DomainServices["AvailabilityEngine & BookingService"]
+    end
+
+    subgraph Persistence["Persistence Layer (Production)"]
+        Pool["pg.Pool Connection Pool"]
+        Postgres[("PostgreSQL Database\n(ACID Engine + Row Locks)")]
+    end
+
+    UI --> Context
+    Context --> Services
+    
+    %% Dual-Mode Routing
+    Services -->|Standalone / Demo Mode| MockRouter
+    MockRouter --> CookieDB
+    CookieDB <--> Cookies
+    CookieDB <--> LocalStorage
+
+    Services -->|Production API Mode| Gateway
+    Gateway --> RateLimit
+    RateLimit --> AuthMiddleware
+    AuthMiddleware --> Controllers
+    Controllers --> DomainServices
+    DomainServices --> Pool
+    Pool --> Postgres
 ```
+
+---
+
+## 📊 Engineering Flowcharts
+
+### 1. ACID Concurrency & Double-Booking Prevention Flow
+
+When multiple users attempt to book the final available slot simultaneously, ReservePulse guarantees zero double-bookings through serializable transactions and row-level locking:
+
+```mermaid
+sequenceDiagram
+    autonumber
+    actor CustomerA as Customer A (Req 1)
+    actor CustomerB as Customer B (Req 2)
+    participant API as Booking API / Service
+    participant DB as PostgreSQL / State Engine
+
+    CustomerA->>API: POST /bookings (Slot X, 1 Attendee)
+    CustomerB->>API: POST /bookings (Slot X, 1 Attendee)
+    
+    critical Database Transaction A
+        API->>DB: BEGIN TRANSACTION
+        API->>DB: SELECT * FROM slots WHERE id = 'X' FOR UPDATE
+        Note over DB: Lock acquired for Customer A.<br/>Customer B request is queued.
+        DB-->>API: Capacity = 1, Booked = 0 (Available)
+        API->>DB: UPDATE slots SET booked_capacity = 1 WHERE id = 'X'
+        API->>DB: INSERT INTO bookings (id, status, ...) VALUES ('bk_1', 'confirmed', ...)
+        API->>DB: COMMIT TRANSACTION
+    end
+    API-->>CustomerA: 201 Created (Booking Reference: RP-884210)
+
+    critical Database Transaction B (Unblocked)
+        API->>DB: BEGIN TRANSACTION
+        API->>DB: SELECT * FROM slots WHERE id = 'X' FOR UPDATE
+        DB-->>API: Capacity = 1, Booked = 1 (Full)
+        API->>DB: ROLLBACK TRANSACTION
+    end
+    API-->>CustomerB: 409 Conflict (SLOT_UNAVAILABLE)
+    Note over CustomerB: Frontend triggers Toast Alert,<br/>clears stale slot, and refetches availability.
+```
+
+---
+
+### 2. Dynamic Availability Engine Flow
+
+The availability engine dynamically generates and validates bookable slots across complex operating calendars:
+
+```mermaid
+flowchart TD
+    Start["Request Slot Availability\n(serviceId, startDate, endDate)"] --> LoadService["Fetch Service Metadata\n(Duration, Buffers, Lead Time, Horizon)"]
+    LoadService --> LoadResource["Fetch Assigned Resources & Schedules"]
+    LoadResource --> DayLoop{"Iterate Each Day in Horizon"}
+    
+    DayLoop --> CheckOperatingHours{"Is Resource Working\non Day of Week?"}
+    CheckOperatingHours -- No --> MarkUnavailable["Mark Day Unavailable"]
+    CheckOperatingHours -- Yes --> SplitShifts["Parse Shift Windows\n(e.g., 09:00-12:00, 13:00-17:00)"]
+    
+    SplitShifts --> GenerateSlots["Generate Time Slices\nStep = Duration + Buffers"]
+    GenerateSlots --> FilterLeadTime{"Slot Start > Current Time + minLeadTimeHours?"}
+    FilterLeadTime -- No --> DropSlot["Discard Slot (Lead Time Violated)"]
+    FilterLeadTime -- Yes --> CheckBookings{"Overlaps Existing Non-Cancelled Booking\n(confirmed or pending)?"}
+    
+    CheckBookings -- Yes --> CheckCapacity{"Capacity Remaining >= Attendee Count?"}
+    CheckCapacity -- No --> MarkBooked["Set Slot Status: Booked / Locked"]
+    CheckCapacity -- Yes --> MarkAvailable["Set Slot Status: Available"]
+    CheckBookings -- No --> MarkAvailable
+    
+    MarkAvailable --> Aggregate["Aggregate Bookable Day Availability"]
+    MarkBooked --> Aggregate
+    DropSlot --> Aggregate
+    MarkUnavailable --> Aggregate
+    
+    Aggregate --> Output["Return Availability Envelope\n(days, slots, totalBookableSlots)"]
+```
+
+---
+
+### 3. Role-Based Access Control (RBAC) Hierarchy
+
+ReservePulse enforces strict role boundaries across three tiers:
+
+```mermaid
+graph TD
+    classDef customer fill:#ECFDF5,stroke:#059669,stroke-width:2px;
+    classDef organiser fill:#F0FDFA,stroke:#0D9488,stroke-width:2px;
+    classDef admin fill:#F5F3FF,stroke:#7C3AED,stroke-width:2px;
+
+    User["Authenticated User Profile"] --> RoleCheck{"Inspect Role"}
+
+    RoleCheck -->|Role: CUSTOMER| CustPortal["Customer Portal"]:::customer
+    RoleCheck -->|Role: ORGANISER| OrgPortal["Organiser Workspace"]:::organiser
+    RoleCheck -->|Role: ADMIN| AdminPortal["Platform Governance"]:::admin
+
+    subgraph CustomerPrivileges["Customer Permissions"]
+        CustPortal --> C1["Browse Catalog & Previews"]
+        CustPortal --> C2["Calculate Dynamic Slots"]
+        CustPortal --> C3["Submit Intake Answers"]
+        CustPortal --> C4["Track Personal Bookings"]
+        CustPortal --> C5["Cancel Self Reservations"]
+    end
+
+    subgraph OrganiserPrivileges["Organiser Permissions"]
+        OrgPortal --> O1["Draft & Publish Services"]
+        OrgPortal --> O2["Manage Physical & Compute Resources"]
+        OrgPortal --> O3["Define Weekly Shifts & Buffers"]
+        OrgPortal --> O4["Build Custom Intake Forms"]
+        OrgPortal --> O5["Confirm or Reschedule Bookings"]
+    end
+
+    subgraph AdminPrivileges["Administrator Permissions"]
+        AdminPortal --> A1["Platform-Wide Telemetry & KPIs"]
+        AdminPortal --> A2["User Role Promotion / Demotion"]
+        AdminPortal --> A3["Cross-Tenant Booking Oversight"]
+        AdminPortal --> A4["System-Wide Audit Log Inspection"]
+        AdminPortal --> A5["Protected Governance (Self-Demotion Guard)"]
+    end
+```
+
+---
+
+## 🔍 Deep Feature Breakdown
+
+### 1. Dual-Mode Architecture & Cookie Database Engine
+ReservePulse features an innovative **Dual-Mode Persistence Architecture** that allows the entire web application to run completely standalone on frontend hosts like Vercel, while remaining 100% compatible with production PostgreSQL backends:
+
+- **In-Browser Cookie & LocalStorage Database**: State is maintained client-side via a reactive storage manager (`cookieDb.ts`). Active session tokens, user profiles, services count, and bookings are written to browser cookies (`rp_auth_token`, `rp_auth_user`, `rp_user_role`, `rp_db_stats`), while complete JSON models are synchronized to `localStorage`.
+- **Zero-Latency Mock API Router**: An intelligent interceptor (`mockRouter.ts`) captures standard REST calls (`/auth/*`, `/services/*`, `/bookings/*`, `/resources/*`, `/admin/*`, `/analytics/*`, `/health`) and fulfills them in-memory with simulated async delays, allowing loading spinners and micro-animations to render realistically.
+- **Persistence Across Sessions**: Any booking created, service published, or role modified persists across page refreshes and browser restarts without a single database error!
+- **1-Click Seed Reset**: Testers can restore the entire application back to its clean initial seed state at any time via the "Reset Sample Data" button.
+
+---
+
+### 2. Real-Time Slot Availability & Collision Engine
+- **Configurable Service Durations & Buffer Times**: Supports before/after buffers (e.g., 15 minutes preparation, 15 minutes room cleanup) to prevent back-to-back overlaps.
+- **Scheduling Horizons & Minimum Lead Time**: Prevents customers from booking past the allowable booking window (e.g., 30 days in advance) or booking on too-short notice (e.g., minimum 2 hours lead time).
+- **Split-Shift Operating Hours**: Supports resources operating across multiple shift windows in a single day (e.g., 09:00–12:00 and 13:30–18:00).
+- **Collision Detection**: Real-time evaluation against confirmed and pending reservations guarantees that slots display accurate remaining capacities.
+
+---
+
+### 3. Configurable Intake Questionnaires
+- **Dynamic Field Types**: Organisers can create custom questionnaires per service supporting `text`, `textarea`, `select`, `checkbox`, and `radio`.
+- **Validation & Requirements**: Backend validators and frontend forms enforce mandatory responses before booking submission.
+- **Immutable Ledger Archival**: Answers are permanently stored alongside the booking record, ensuring historical audit integrity even if the service questionnaire is modified later.
+
+---
+
+### 4. Resilient State Machine & PCI-Compliant Abstraction
+- **Booking Lifecycle**:
+  $$\text{Draft} \longrightarrow \text{Pending} \longrightarrow \text{Confirmed} \longrightarrow \text{Completed}$$
+  $$\text{Pending / Confirmed} \longrightarrow \text{Cancelled (Releases Capacity)}$$
+- **Zero Cardholder Data Storage**: Strict PCI-DSS compliant design. No raw PAN, CVV, or card data is ever handled by backend servers. Built-in payment abstraction interfaces (`IPaymentProvider`) support drop-in Stripe or Adyen payment intent integration.
+
+---
+
+### 5. Operational Telemetry & Real-Time Analytics
+- **Executive KPI Dashboard**: Total volume, confirmed revenue, completion rate, and active resources.
+- **Timeline Trends**: Volume aggregations grouped by day or hour to track demand patterns.
+- **24-Hour Peak Load Heatmap**: Identifies peak operational windows (e.g., busiest hours between 02:00 PM – 04:00 PM).
+- **Resource Fleet Utilization**: Granular breakdown of booked minutes vs. available shift minutes per resource.
+
+---
+
+### 6. Enterprise Admin Governance & Audit Logging
+- **User Administration**: Activate/deactivate accounts, inspect user bookings, and promote roles between Customer, Organiser, and Admin.
+- **Self-Preservation Guards**: Admins cannot accidentally deactivate their own accounts or demote themselves, preventing administrative lockouts.
+- **Immutable Audit Trail**: Chronological event logging tracks user logins, booking creations, service publications, and permission updates with timestamped metadata.
+
+---
+
+## 🔑 Interactive Demo Accounts & Testing Sandbox
+
+The sign-in page features an interactive **2-Column Testing Sandbox** with 1-click autofill for instant evaluation:
+
+| Persona | Role | Email | Password | Primary Capabilities to Test |
+| :--- | :--- | :--- | :--- | :--- |
+| **Alex Morgan** | `CUSTOMER` | `customer@reservepulse.com` | `Customer@123` | Public catalog browsing, availability calendar, custom intake questionnaires, and booking confirmation. |
+| **Jordan Vance** | `ORGANISER` | `organiser@reservepulse.com` | `Organiser@123` | Service catalog drafting, workspace/compute resource management, shift planning, and reservation approval. |
+| **Morgan Reed** | `ADMIN` | `admin@reservepulse.com` | `Admin@123` | Platform analytics, user administration, role promotion, system audit logs, and global booking inspection. |
+
+> [!TIP]
+> **Flexible Testing**: You can also enter **any custom email and password** on the login page; the in-browser engine will generate an account on the fly so you can test any custom scenario!
+
+---
+
+## 📁 Directory Structure
+
+```text
 ReservePulse/
-├── frontend/                     # Single-Page Application (React 19 + TypeScript + Vite)
-│   └── src/
-│       ├── assets/               # Brand assets and styling utilities
-│       ├── components/           # Reusable UI components & design system units
-│       │   ├── admin/            # Platform administration consoles & user tables
-│       │   ├── analytics/        # Interactive SVG KPI charts & distribution bars
-│       │   ├── booking/          # Multi-step booking wizard with live sync
-│       │   ├── common/           # ErrorBoundary, Skeletons, Modals, Badges, Toasts
-│       │   ├── feedback/         # Toast container & notification manager
-│       │   ├── layout/           # Header, Navigation, Footer shells
-│       │   ├── organiser/        # Schedule planners, intake question builders
-│       │   └── payment/          # Payment intent checkout & confirmation dialogs
-│       ├── context/              # Toast & global application contexts
-│       ├── hooks/                # Custom React hooks (useLiveAvailability, useAnalytics)
-│       ├── layouts/              # Route layouts (MainLayout)
-│       ├── pages/                # Route views (BookingWizard, Organiser, Admin, Analytics)
-│       ├── services/             # Typed API clients & HTTP response unwrappers
-│       ├── types/                # Domain types (User, Service, Booking, Payment, Analytics)
-│       └── utils/                # Date math, formatters, slot helpers
+├── frontend/                         # Single-Page Application (React 19 + TypeScript + Vite)
+│   ├── src/
+│   │   ├── components/               # UI components, layout shells, booking wizard, tables, toasts
+│   │   │   ├── auth/                 # Protected route wrapper & auth guards
+│   │   │   ├── booking/              # Multi-step booking wizard with live slot synchronization
+│   │   │   ├── common/               # Header, Footer, ErrorBoundary, Modals, EmptyState
+│   │   │   └── ui/                   # Button, Card, Input, Badge, Table, Toast design system
+│   │   ├── context/                  # AuthProvider, ToastContext, global session management
+│   │   ├── pages/                    # Route views (HomePage, Services, Booking, Admin, Analytics)
+│   │   │   └── auth/                 # Redesigned 2-column split LoginPage, SignupPage, OTP
+│   │   ├── services/                 # API clients, mock router, typed HTTP adapters
+│   │   │   ├── api.ts                # Master API client with transparent CookieDB fallback
+│   │   │   └── mockRouter.ts         # In-browser REST router handling all endpoints
+│   │   ├── utils/                    # Date helpers, formatters, slot math
+│   │   │   └── cookieDb.ts           # Client-side Cookie & LocalStorage database engine
+│   │   └── App.tsx                   # Central client router with role-based layout nesting
+│   ├── package.json
+│   ├── vercel.json                   # Vercel SPA routing rewrites
+│   └── vite.config.ts
 │
-├── backend/                      # High-Concurrency REST API (Node.js + Express + TypeScript)
-│   └── src/
-│       ├── config/               # Database pool, environment, JWT configuration
-│       ├── controllers/          # Route controllers (Auth, Booking, Admin, Analytics, etc.)
-│       ├── middleware/           # RBAC, JWT auth, Error middleware, Request logging
-│       ├── models/               # Domain interfaces & entity contracts
-│       ├── routes/               # API v1 route blueprints
-│       ├── scripts/              # Automated audit & concurrency verification suites
-│       ├── services/             # Business logic (AvailabilityEngine, BookingService, etc.)
-│       ├── utils/                # Standardized ApiResponse envelope & Winston logger
-│       ├── validators/           # Zod validation schemas
-│       ├── app.ts                # Express application setup & middleware stack
-│       └── server.ts             # Process lifecycle & graceful shutdown
+├── backend/                          # High-Concurrency REST API (Node.js + Express + TypeScript)
+│   ├── src/
+│   │   ├── config/                   # PostgreSQL pool, environment config, JWT signing
+│   │   ├── controllers/              # Route handlers (Auth, Booking, Admin, Analytics, Health)
+│   │   ├── middleware/               # RBAC guards, request logging, error middleware, rate limiting
+│   │   ├── services/                 # AvailabilityEngine, BookingService, ResourceService
+│   │   ├── validators/               # Zod input validation schemas
+│   │   ├── app.ts                    # Express application pipeline & CORS configuration
+│   │   └── server.ts                 # HTTP server lifecycle & graceful shutdown
+│   └── package.json
 │
-├── database/                     # Persistence Layer
-│   ├── migrations/               # Versioned chronological SQL migrations (001 - 008)
-│   └── seed/                     # Deterministic seed datasets & demo accounts
+├── database/                         # Database Migration & Persistence Assets
+│   ├── migrations/                   # Chronological SQL migrations (001 - 008)
+│   └── seed/                         # Deterministic development seed dataset
 │
-├── docs/                         # Engineering Specifications
-│   ├── analytics.md              # Analytics aggregation definitions & metrics formulas
-│   ├── api.md                    # Complete REST API v1 endpoint specification
-│   ├── architecture.md           # System design & Mermaid architectural blueprints
-│   ├── availability.md           # Slot availability calculation engine design
-│   ├── database.md               # Database schema reference & ER diagrams
-│   └── setup.md                  # Comprehensive developer & production setup guide
+├── docs/                             # Engineering Architecture & Reference Manuals
+│   ├── api.md                        # Comprehensive REST API v1 endpoint specifications
+│   ├── architecture.md               # Detailed architectural blueprints & data flow models
+│   ├── availability.md               # Availability engine mathematics & collision detection
+│   ├── database.md                   # Schema reference, constraints & entity relationship diagrams
+│   └── setup.md                      # Developer installation & production deployment guide
 │
-├── .env.example                  # Root environment template
-├── package.json                  # Root orchestration scripts
-└── README.md                     # Platform documentation
+├── vercel.json                       # Root Vercel deployment orchestration
+├── package.json                      # Monorepo root orchestration scripts
+└── README.md                         # Platform documentation
 ```
 
 ---
 
-## 🚀 Key Enterprise Capabilities
+## 💻 Getting Started & Local Development
 
-### 1. 🛡️ ACID-Compliant Concurrency & Double-Booking Prevention
-- **Row-Level Locking**: Employs `SELECT ... FOR UPDATE` on slot capacity records inside transactional blocks (`BEGIN` / `COMMIT`).
-- **Atomic Capacity Decrement**: Immediate validation of `remaining_capacity >= requested_attendees` prevents over-allocation.
-- **Race Condition Rejection**: When multiple requests contend for the last available slot simultaneously, exactly one succeeds (`201 Created`) while competing bursts receive `409 Conflict` with `SLOT_UNAVAILABLE` details.
-- **Graceful Client Recovery**: Frontend listens for `SLOT_UNAVAILABLE` error envelopes and immediately prompts the user with an actionable toast, clearing the stale slot and refetching real-time availability.
-
-### 2. ⚡ Real-Time Slot Availability Engine
-- Calculates availability across working hours, multiple split shifts per day, customized buffer periods, minimum advance notice, and maximum scheduling horizons.
-- Accounts for existing non-cancelled bookings (`confirmed`, `pending`) and capacity thresholds.
-- Polling and WebSocket-ready hooks (`useLiveAvailability`) trigger background refreshes with subtle UI sync indicators.
-
-### 3. 📝 Configurable Intake Questions
-- Organisers can define custom per-service questions with flexible field types: `text`, `textarea`, `select`, `checkbox`, `radio`.
-- Drag-and-drop or index-based reordering, required/optional toggle, and option list management.
-- Backend enforces required answers upon booking submission and immutably archives customer responses alongside the booking ledger.
-
-### 4. 💳 Resilient Payment State Machine & Zero-Data-Leak Gateway
-- Provider abstraction interface (`IPaymentProvider`) supports seamless extension (built-in `MockPaymentProvider` ready for Stripe / Adyen / Square).
-- Decoupled payment intents, authorization, capture, and failure lifecycle:
-  - `pending` $\rightarrow$ `confirmed` (captured)
-  - `pending` $\rightarrow$ `payment_failed` (auto-releases slot capacity back to the pool)
-  - `confirmed` $\rightarrow$ `cancelled` (releases slot capacity)
-- **Zero Cardholder Data Storage**: Strict PCI compliance—no raw PAN, CVV, or magnetic stripe data is ever processed or stored on backend servers.
-
-### 5. 👥 Role-Based Access Control (RBAC) & Governance
-- Granular permissions mapped across three tiers:
-  - `CUSTOMER`: Public catalog, slot querying, personal reservations, payment confirmation.
-  - `ORGANISER`: Service catalog drafting/publishing, fleet resources, weekly operating schedules, booking management.
-  - `ADMIN`: Platform-wide oversight, cross-tenant booking inspection, user activation/deactivation, role promotion/demotion.
-- Safe admin governance guards: Self-deactivation and self-demotion are blocked with validation errors.
-
-### 6. 📊 Real-Time Operational Analytics
-- High-efficiency SQL aggregations for:
-  - **Summary Metrics**: Total appointments, confirmed revenue, active providers, platform completion rate.
-  - **Booking Trends**: Timeline volume grouped by dynamic time intervals (hourly, daily).
-  - **Peak Hours**: 24-hour load distribution heatmaps to detect peak operational hours.
-  - **Provider Utilization**: Utilization rate (%) and hours booked per provider.
-- Filterable by presets (`today`, `week`, `month`) or arbitrary date ranges.
-
-### 7. 💎 Production UX & Resilience
-- **Error Boundaries**: Component-level error boundaries isolate unexpected render crashes without bringing down the entire application.
-- **Skeleton Screens**: Content-matching shimmer loaders eliminate layout shift during async data fetches.
-- **Optimistic Locking Alerts**: Instant toast alerts when slots are claimed by concurrent users.
-- **Dual-Mode Persistence**: Production PostgreSQL with automated in-memory fallback for lightweight testing and development.
-
----
-
-## 🔑 Demo Accounts & Pre-Seeded Roles
-
-For testing and demonstration, the platform includes three pre-seeded accounts:
-
-| Role | Email | Password | Access Privileges |
-| :--- | :--- | :--- | :--- |
-| **Customer** | `customer@reservepulse.com` | `Customer@123` | Booking Wizard, Personal Bookings |
-| **Organiser** | `organiser@reservepulse.com` | `Organiser@123` | Services, Resources, Schedules, Bookings |
-| **Admin** | `admin@reservepulse.com` | `Admin@123` | Admin Portal, User Management, Global Bookings, Analytics |
-
----
-
-## ⚙️ Environment Variables
-
-### Backend Configuration (`backend/.env`)
-
-| Variable | Type | Default | Description |
-| :--- | :--- | :--- | :--- |
-| `NODE_ENV` | String | `development` | Runtime environment (`development`, `production`, `test`) |
-| `PORT` | Number | `5000` | HTTP port for the Express backend |
-| `API_PREFIX` | String | `/api/v1` | Base route prefix for all REST endpoints |
-| `CORS_ORIGIN` | String | `http://localhost:5173` | Allowed CORS origins (comma-separated for multiples) |
-| `DATABASE_URL` | String | `postgresql://postgres:postgres@localhost:5432/reservepulse_dev` | PostgreSQL connection URI |
-| `DB_POOL_MAX` | Number | `20` | Maximum connections in pg pool |
-| `DB_IDLE_TIMEOUT_MS` | Number | `30000` | Connection idle timeout in milliseconds |
-| `DB_CONNECTION_TIMEOUT_MS` | Number | `5000` | Connection timeout before falling back |
-| `LOG_LEVEL` | String | `debug` | Winston log level (`debug`, `info`, `warn`, `error`) |
-| `JWT_SECRET` | String | *Min 32 chars* | HMAC SHA-256 signing secret for authentication tokens |
-| `JWT_EXPIRES_IN` | String | `7d` | Token validity window |
-| `OTP_EXPIRY_MINUTES` | Number | `10` | One-time password expiration time |
-
-### Frontend Configuration (`frontend/.env`)
-
-| Variable | Type | Default | Description |
-| :--- | :--- | :--- | :--- |
-| `VITE_API_URL` | String | `http://localhost:5000/api/v1` | Backend API endpoint URL |
-| `VITE_APP_TITLE` | String | `ReservePulse` | Browser tab title prefix |
-
----
-
-## ⚡ Quick Start Guide
-
-### 1. Prerequisites
-- **Node.js**: `>= 18.0.0` (Recommended: v20 LTS or v22 LTS)
+### Prerequisites
+- **Node.js**: `>= 18.0.0`
 - **npm**: `>= 9.0.0`
-- **PostgreSQL**: `>= 14.0` (Optional — system automatically activates in-memory mode if PostgreSQL is unavailable)
+- **PostgreSQL** *(optional for full-stack mode)*: `>= 15.0`
 
-### 2. Installation
+### 1. Clone the Repository
 ```bash
-# Clone the repository
-git clone https://github.com/your-org/reservepulse.git
+git clone https://github.com/rudartrivedi29/ReservePulse.git
 cd ReservePulse
+```
 
-# Install all dependencies across root, backend, and frontend
+### 2. Install Dependencies
+```bash
 npm run install:all
 ```
 
-### 3. Configure Environment
+### 3. Run Standalone Frontend (Zero Database Required)
+To run the frontend powered by the in-browser **Cookie Database Engine**:
 ```bash
-# Copy backend template
-cp backend/.env.example backend/.env
-
-# Copy frontend template
-cp frontend/.env.example frontend/.env
+npm run dev:frontend
 ```
+Open **[http://localhost:5173](http://localhost:5173)** in your browser. All booking, service creation, admin, and authentication flows work out of the box!
 
-### 4. Database Setup (Optional)
-If using a local or remote PostgreSQL instance:
+### 4. Run Full-Stack Mode (Express + PostgreSQL)
 ```bash
-# Create database
-createdb -U postgres reservepulse_dev
+# 1. Copy environment template
+cp .env.example .env
 
-# Run chronological migrations (001 through 008)
-psql -U postgres -d reservepulse_dev -f database/migrations/001_initial_schema.sql
-psql -U postgres -d reservepulse_dev -f database/migrations/002_reservepulse_schema.sql
-psql -U postgres -d reservepulse_dev -f database/migrations/003_auth_credentials.sql
-psql -U postgres -d reservepulse_dev -f database/migrations/004_service_management.sql
-psql -U postgres -d reservepulse_dev -f database/migrations/005_resource_status_types.sql
-psql -U postgres -d reservepulse_dev -f database/migrations/006_booking_concurrency_hardening.sql
-psql -U postgres -d reservepulse_dev -f database/migrations/007_payment_ready_flow.sql
-psql -U postgres -d reservepulse_dev -f database/migrations/008_admin_user_management.sql
+# 2. Start PostgreSQL and run migrations
+npm run migrate --prefix backend
 
-# Seed demo dataset
-psql -U postgres -d reservepulse_dev -f database/seed/seed.sql
-```
-
-### 5. Launch Development Servers
-```bash
+# 3. Start concurrently (Backend on :5000, Frontend on :5173)
 npm run dev
 ```
-- **Frontend Application**: [http://localhost:5173](http://localhost:5173)
-- **Backend API**: [http://localhost:5000](http://localhost:5000)
-- **System Health Check**: [http://localhost:5000/api/v1/health](http://localhost:5000/api/v1/health)
 
 ---
 
-## 🧪 Automated Test & Audit Suite
+## 🚀 Deployment Guide (Vercel & Cloud Hosting)
 
-ReservePulse includes an automated end-to-end audit suite covering all 13 core subsystems (66 verification points) plus targeted stress tests:
+### Deploy Frontend to Vercel (Recommended)
+1. Go to **[vercel.com](https://vercel.com)** and click **Add New Project**.
+2. Import the `rudartrivedi29/ReservePulse` repository.
+3. Configure the build settings:
+   - **Framework Preset**: `Vite`
+   - **Root Directory**: Select `frontend` (or leave `./` with root [vercel.json](file:///c:/Users/rudar/OneDrive/Desktop/ReservePulse/vercel.json))
+   - **Build Command**: `npm run build`
+   - **Output Directory**: `dist`
+4. Click **Deploy**!
+   > *Your site will be live immediately in standalone mode with persistent in-browser cookie database storage.*
 
-```bash
-# Run the complete 66-point production audit test suite
-npm run test:audit
-
-# Run specific functional suites
-npm run test:concurrency   # 22 concurrency & double-booking stress checks
-npm run test:questions     # Configurable question builder & answer validation
-npm run test:payment       # 46 payment state machine & PCI compliance checks
-npm run test:organiser     # Service, resource, and schedule management tests
-npm run test:admin         # 49 platform governance & RBAC enforcement checks
-npm run test:analytics     # Aggregation, peak hours, and utilization tests
-
-# Full typecheck across entire frontend and backend
-npm run typecheck
-```
-
----
-
-## 📡 REST API Summary
-
-All endpoints return a standardized JSON envelope:
-```json
-{
-  "success": true,
-  "statusCode": 200,
-  "data": { ... },
-  "meta": { "timestamp": "2026-09-25T12:00:00.000Z" }
-}
-```
-
-### Core API Route Map
-
-| Method | Endpoint | Access | Purpose |
-| :--- | :--- | :--- | :--- |
-| `GET` | `/api/v1/health` | Public | System status, uptime, and database connection state |
-| `POST` | `/api/v1/auth/register` | Public | Register new customer account |
-| `POST` | `/api/v1/auth/login` | Public | Authenticate user & issue JWT token |
-| `GET` | `/api/v1/auth/me` | Authenticated | Retrieve authenticated user profile |
-| `GET` | `/api/v1/services` | Public | Retrieve active services catalog |
-| `GET` | `/api/v1/services/:id/preview` | Token / Public | Preview service (including draft state via share token) |
-| `GET` | `/api/v1/services/:id/questions` | Public | Retrieve active customer intake questions |
-| `GET` | `/api/v1/services/:id/availability` | Public | Calculate real-time available booking slots |
-| `POST` | `/api/v1/bookings` | Public / Customer | Create reservation with ACID concurrency protection |
-| `GET` | `/api/v1/bookings/:id` | Authenticated | Retrieve booking details and answers |
-| `POST` | `/api/v1/bookings/:id/payment-intent` | Customer | Initialize payment intent |
-| `POST` | `/api/v1/bookings/:id/confirm-payment` | Customer | Capture payment & transition booking to `confirmed` |
-| `POST` | `/api/v1/bookings/:id/cancel` | Customer / Organiser | Cancel reservation and release slot capacity |
-| `GET` | `/api/v1/organiser/services` | Organiser / Admin | List managed services |
-| `POST` | `/api/v1/organiser/services` | Organiser / Admin | Create new service draft |
-| `PATCH` | `/api/v1/organiser/services/:id/status` | Organiser / Admin | Publish or archive service |
-| `GET` | `/api/v1/organiser/resources` | Organiser / Admin | List provider fleet & equipment |
-| `PUT` | `/api/v1/organiser/resources/:id/schedule` | Organiser / Admin | Save weekly working hours & shifts |
-| `GET` | `/api/v1/admin/stats` | Admin | Platform-wide operational overview |
-| `GET` | `/api/v1/admin/users` | Admin | Paginated user management directory |
-| `PATCH` | `/api/v1/admin/users/:id/status` | Admin | Activate or deactivate user account |
-| `PATCH` | `/api/v1/admin/users/:id/role` | Admin | Promote or demote user role |
-| `GET` | `/api/v1/analytics/overview` | Organiser / Admin | Key metrics, trends, peak hours, utilization |
-
-*See [`docs/api.md`](./docs/api.md) for complete payload contracts, validation schemas, and query parameters.*
-
----
-
-## 🚢 Production Deployment Guide
-
-### Option 1: Docker & Container Orchestration
-
-A multi-stage Docker build produces lightweight production images:
-
-#### Backend `Dockerfile`
-```dockerfile
-FROM node:20-alpine AS builder
-WORKDIR /app
-COPY package*.json tsconfig.json ./
-RUN npm ci
-COPY src/ ./src/
-RUN npm run build
-
-FROM node:20-alpine AS runner
-WORKDIR /app
-ENV NODE_ENV=production
-COPY package*.json ./
-RUN npm ci --only=production
-COPY --from=builder /app/dist ./dist
-EXPOSE 5000
-CMD ["node", "dist/server.js"]
-```
-
-#### Frontend `Dockerfile` (Nginx Alpine)
-```dockerfile
-FROM node:20-alpine AS builder
-WORKDIR /app
-COPY package*.json tsconfig*.json vite.config.ts index.html ./
-RUN npm ci
-COPY src/ ./src/
-COPY public/ ./public/
-RUN npm run build
-
-FROM nginx:alpine AS runner
-COPY --from=builder /app/dist /usr/share/nginx/html
-COPY nginx.conf /etc/nginx/conf.d/default.conf
-EXPOSE 80
-CMD ["nginx", "-g", "daemon off;"]
-```
-
-### Option 2: PM2 & Nginx Reverse Proxy (Virtual Machine / Bare Metal)
-
-#### 1. Compile Bundles
-```bash
-npm run build
-```
-
-#### 2. Configure PM2 (`ecosystem.config.js`)
-```javascript
-module.exports = {
-  apps: [
-    {
-      name: 'reservepulse-api',
-      script: './backend/dist/server.js',
-      instances: 'max',
-      exec_mode: 'cluster',
-      env_production: {
-        NODE_ENV: 'production',
-        PORT: 5000
-      }
-    }
-  ]
-};
-```
-Start PM2 process:
-```bash
-pm2 start ecosystem.config.js --env production
-pm2 save
-pm2 startup
-```
-
-#### 3. Configure Nginx Reverse Proxy
-```nginx
-server {
-    listen 80;
-    server_name your-domain.com;
-    return 301 https://$host$request_uri;
-}
-
-server {
-    listen 443 ssl http2;
-    server_name your-domain.com;
-
-    ssl_certificate /etc/letsencrypt/live/your-domain.com/fullchain.pem;
-    ssl_certificate_key /etc/letsencrypt/live/your-domain.com/privkey.pem;
-    ssl_protocols TLSv1.2 TLSv1.3;
-    ssl_ciphers HIGH:!aNULL:!MD5;
-
-    # Frontend Single Page App
-    location / {
-        root /var/www/reservepulse/frontend/dist;
-        index index.html;
-        try_files $uri $uri/ /index.html;
-    }
-
-    # API Proxy
-    location /api/ {
-        proxy_pass http://localhost:5000;
-        proxy_http_version 1.1;
-        proxy_set_header Upgrade $http_upgrade;
-        proxy_set_header Connection 'upgrade';
-        proxy_set_header Host $host;
-        proxy_set_header X-Real-IP $remote_addr;
-        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
-        proxy_set_header X-Forwarded-Proto $scheme;
-        proxy_cache_bypass $http_upgrade;
-    }
-}
-```
-
----
-
-## 📄 Documentation Sitemap
-
-- [Developer Setup & Environment Guide](./docs/setup.md)
-- [System Architecture & Data Flows](./docs/architecture.md)
-- [REST API v1 Reference](./docs/api.md)
-- [Availability Engine & Collision Detection](./docs/availability.md)
-- [Database Schema & Migration Guide](./docs/database.md)
-- [Analytics Formulas & Aggregation Engine](./docs/analytics.md)
+### Optional: Deploying the Express Backend
+To connect a live cloud backend to your Vercel deployment:
+1. Spin up a free cloud PostgreSQL database on **[Neon.tech](https://neon.tech)** or **[Supabase](https://supabase.com)** and execute the schema migrations in `database/migrations/`.
+2. Deploy the `backend/` folder to **[Render.com](https://render.com)** or **[Railway.app](https://railway.app)**.
+3. Set `CORS_ORIGIN` in the backend environment variables to your Vercel URL (e.g. `https://reservepulse.vercel.app`).
+4. In your Vercel Project Settings, add `VITE_API_URL` pointing to your backend URL (e.g. `https://reservepulse-api.onrender.com/api/v1`) and trigger a redeploy.
 
 ---
 
 ## 📜 License & Compliance
 
-ReservePulse is built under the MIT License. Designed in compliance with PCI-DSS guidance for hosted payment abstractions and zero-cardholder-data retention.
-
+ReservePulse is open-source software licensed under the **[MIT License](https://opensource.org/licenses/MIT)**. Designed in accordance with PCI-DSS guidelines for hosted payment abstractions and zero-cardholder-data retention.
