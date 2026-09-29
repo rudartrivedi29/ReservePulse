@@ -339,6 +339,8 @@ ReservePulse/
 │   └── seed/                         # Deterministic development seed dataset
 │
 ├── docs/                             # Engineering Architecture & Reference Manuals
+│   ├── wireframes.md                 # UI/UX wireframe specifications & component architecture
+│   ├── wireframes/                   # High-fidelity visual wireframe mockups (PNG/JPG)
 │   ├── api.md                        # Comprehensive REST API v1 endpoint specifications
 │   ├── architecture.md               # Detailed architectural blueprints & data flow models
 │   ├── availability.md               # Availability engine mathematics & collision detection
