@@ -3,16 +3,7 @@ import { useNavigate, useLocation, Link } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
 import { useToast } from '../../components/ui/ToastContext';
 import { cookieDb } from '../../utils/cookieDb';
-import {
-  Card,
-  CardHeader,
-  CardTitle,
-  CardDescription,
-  CardContent,
-  CardFooter,
-  Button,
-  Input,
-} from '../../components/ui';
+import { Button, Input } from '../../components/ui';
 
 interface DemoAccount {
   role: 'customer' | 'organiser' | 'admin';
@@ -20,8 +11,9 @@ interface DemoAccount {
   name: string;
   email: string;
   pass: string;
-  tag: string;
+  badge: string;
   description: string;
+  icon: string;
 }
 
 const DEMO_ACCOUNTS: DemoAccount[] = [
@@ -31,8 +23,9 @@ const DEMO_ACCOUNTS: DemoAccount[] = [
     name: 'Alex Morgan',
     email: 'customer@reservepulse.com',
     pass: 'Customer@123',
-    tag: 'Client Portal',
-    description: 'Browse services, reserve time slots, intake forms & live tracking',
+    badge: 'Client Portal',
+    description: 'Browse catalog, reserve time slots, intake forms & live tracking',
+    icon: '👤',
   },
   {
     role: 'organiser',
@@ -40,8 +33,9 @@ const DEMO_ACCOUNTS: DemoAccount[] = [
     name: 'Jordan Vance',
     email: 'organiser@reservepulse.com',
     pass: 'Organiser@123',
-    tag: 'Operations',
+    badge: 'Operations Fleet',
     description: 'Publish services, configure resources, shifts & manage bookings',
+    icon: '💼',
   },
   {
     role: 'admin',
@@ -49,8 +43,9 @@ const DEMO_ACCOUNTS: DemoAccount[] = [
     name: 'Morgan Reed',
     email: 'admin@reservepulse.com',
     pass: 'Admin@123',
-    tag: 'Full Access',
+    badge: 'Full Governance',
     description: 'Platform telemetry, user administration, system audit logs & KPIs',
+    icon: '🛡️',
   },
 ];
 
@@ -63,7 +58,7 @@ export const LoginPage: React.FC = () => {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const [autofillSuccess, setAutofillSuccess] = useState<string | null>(null);
+  const [activePersona, setActivePersona] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
 
   // Extract return redirect if present
@@ -114,14 +109,14 @@ export const LoginPage: React.FC = () => {
     setEmail(acc.email);
     setPassword(acc.pass);
     setError(null);
-    setAutofillSuccess(acc.role);
+    setActivePersona(acc.role);
     toast.info('Credentials Autofilled', `Ready to sign in as ${acc.name} (${acc.title})`);
-    setTimeout(() => setAutofillSuccess(null), 3000);
   };
 
   const handleInstantLogin = async (acc: DemoAccount) => {
     setEmail(acc.email);
     setPassword(acc.pass);
+    setActivePersona(acc.role);
     setError(null);
     setIsSubmitting(true);
 
@@ -147,192 +142,215 @@ export const LoginPage: React.FC = () => {
   };
 
   return (
-    <div className="min-h-[85vh] flex items-center justify-center py-10 px-4 sm:px-6 lg:px-8 font-sans">
-      <div className="max-w-xl w-full space-y-5">
-        {/* Brand header */}
-        <div className="text-center">
-          <Link to="/" className="inline-flex items-center gap-2.5 mb-2 group">
-            <div className="w-10 h-10 rounded-xl bg-gradient-to-tr from-emerald-600 to-teal-500 flex items-center justify-center text-white shadow-lg shadow-emerald-500/20 group-hover:scale-105 transition-transform">
-              <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  strokeWidth="2"
-                  d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"
-                />
-              </svg>
-            </div>
-            <span className="font-extrabold text-2xl tracking-tight text-slate-900">
-              Reserve<span className="text-emerald-600">Pulse</span>
-            </span>
-          </Link>
-          <h2 className="text-xl font-bold text-slate-800">Sign in to test platform features</h2>
-          <p className="mt-1 text-xs text-slate-500">
-            Select a dummy role below for instant autofill or test custom credentials.
-          </p>
-        </div>
-
-        {/* Demo Roles & Autofill Showcase (White & Green Theme) */}
-        <div className="bg-white/95 backdrop-blur-md rounded-2xl p-4 sm:p-5 shadow-xl shadow-emerald-950/5 border border-emerald-200">
-          <div className="flex items-center justify-between mb-3 pb-2.5 border-b border-emerald-100">
-            <div className="flex items-center gap-2">
-              <span className="flex h-2.5 w-2.5 relative">
-                <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
-                <span className="relative inline-flex rounded-full h-2.5 w-2.5 bg-emerald-500"></span>
-              </span>
-              <span className="text-xs font-bold uppercase tracking-wider text-slate-800">
-                1-Click Testing Credentials &amp; Autofill
-              </span>
-            </div>
-            <span className="text-[11px] text-emerald-800 font-semibold px-2.5 py-0.5 rounded-full bg-emerald-50 border border-emerald-200 flex items-center gap-1">
-              <span>🍪</span>
-              <span>Cookie DB Active</span>
-            </span>
-          </div>
-
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
-            {DEMO_ACCOUNTS.map((acc) => {
-              const isSelected = autofillSuccess === acc.role;
-              return (
-                <div
-                  key={acc.role}
-                  className={`rounded-xl p-3.5 border transition-all flex flex-col justify-between ${
-                    isSelected
-                      ? 'border-emerald-500 bg-emerald-50/90 ring-2 ring-emerald-500/30 shadow-md shadow-emerald-500/10'
-                      : 'border-emerald-100/90 bg-emerald-50/30 hover:bg-emerald-50/70 hover:border-emerald-300 shadow-2xs'
-                  }`}
-                >
-                  <div>
-                    <div className="flex items-center justify-between gap-1 mb-1.5">
-                      <span className="font-bold text-sm text-slate-900 flex items-center gap-1.5">
-                        <span className="w-2 h-2 rounded-full bg-emerald-500" />
-                        {acc.title}
-                      </span>
-                      <span className="text-[10px] font-semibold text-emerald-700 bg-emerald-100/70 px-1.5 py-0.5 rounded border border-emerald-200/80">
-                        {acc.tag}
-                      </span>
-                    </div>
-
-                    <div className="text-xs font-bold text-slate-800 truncate">{acc.name}</div>
-                    <div className="text-[11px] text-emerald-700 font-mono truncate">{acc.email}</div>
-                    <p className="text-[11px] text-slate-600 mt-1 line-clamp-2 leading-relaxed">
-                      {acc.description}
-                    </p>
-                  </div>
-
-                  <div className="mt-3.5 pt-2.5 border-t border-emerald-100/80 grid grid-cols-2 gap-2">
-                    <button
-                      type="button"
-                      onClick={() => handleAutofill(acc)}
-                      disabled={isSubmitting}
-                      className="px-2 py-1.5 text-[11px] font-semibold rounded-lg bg-white border border-slate-200 hover:border-emerald-400 hover:bg-emerald-50 hover:text-emerald-800 active:scale-95 text-slate-700 transition-all cursor-pointer text-center shadow-2xs"
-                      title="Fill into login form"
-                    >
-                      Fill Form
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => handleInstantLogin(acc)}
-                      disabled={isSubmitting}
-                      className="px-2 py-1.5 text-[11px] font-bold rounded-lg text-white bg-emerald-600 hover:bg-emerald-700 active:bg-emerald-800 active:scale-95 transition-all cursor-pointer text-center shadow-xs shadow-emerald-600/30"
-                      title="Instant 1-Click login"
-                    >
-                      Login →
-                    </button>
-                  </div>
-                </div>
-              );
-            })}
-          </div>
-
-          {/* Database Persistence Notice */}
-          <div className="mt-3.5 pt-2.5 border-t border-emerald-100 flex items-center justify-between text-[11px] text-slate-500">
-            <span className="flex items-center gap-1.5">
-              <span>💾</span>
-              <span>Data, bookings &amp; services persist in browser Cookies.</span>
-            </span>
-            <button
-              type="button"
-              onClick={handleResetData}
-              className="text-emerald-700 hover:text-emerald-800 font-semibold underline cursor-pointer"
-            >
-              Reset Sample Data
-            </button>
-          </div>
-        </div>
-
-        {/* Login Card Form */}
-        <Card variant="glass" className="shadow-xl shadow-emerald-950/5 border-emerald-200/90 backdrop-blur-xl bg-white/95">
-          <CardHeader>
-            <CardTitle>Sign in with credentials</CardTitle>
-            <CardDescription>
-              Submit the form below (autofilled or type any email/password to test)
-            </CardDescription>
-          </CardHeader>
-
-          <CardContent>
-            {error && (
-              <div className="mb-4 p-3 rounded-xl bg-rose-50 border border-rose-200 text-rose-700 text-xs flex items-start gap-2 animate-in fade-in">
-                <svg className="w-4 h-4 shrink-0 mt-0.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-                </svg>
-                <span>{error}</span>
-              </div>
-            )}
-
-            <form onSubmit={handleSubmit} className="space-y-4">
-              <Input
-                label="Email Address"
-                type="email"
-                placeholder="name@example.com"
-                value={email}
-                onChange={(e) => setEmail(e.target.value)}
-                required
-                autoComplete="email"
-              />
-
-              <div className="space-y-1">
-                <div className="flex items-center justify-between">
-                  <label className="text-xs font-semibold text-slate-700">Password</label>
-                  <span className="text-[11px] text-slate-400">
-                    (Default: <code className="bg-slate-100 px-1 py-0.5 rounded text-slate-700">Role@123</code>)
-                  </span>
-                </div>
-                <Input
-                  type="password"
-                  placeholder="••••••••"
-                  value={password}
-                  onChange={(e) => setPassword(e.target.value)}
-                  required
-                  autoComplete="current-password"
-                />
-              </div>
-
-              <Button
-                type="submit"
-                variant="primary"
-                className="w-full mt-2"
-                size="md"
-                isLoading={isSubmitting}
-                disabled={isSubmitting}
-              >
-                Sign In to Platform
-              </Button>
-            </form>
-          </CardContent>
-
-          <CardFooter className="flex items-center justify-between bg-slate-50/50 border-t border-slate-100 p-4 text-xs text-slate-500">
+    <div className="min-h-[88vh] flex items-center justify-center py-8 px-4 sm:px-6 lg:px-8 font-sans">
+      <div className="max-w-5xl w-full">
+        {/* Unified 2-Column Card Shell */}
+        <div className="bg-white/95 backdrop-blur-xl rounded-3xl shadow-2xl shadow-emerald-950/10 border border-emerald-200/90 overflow-hidden grid grid-cols-1 lg:grid-cols-12">
+          
+          {/* ========================================================================= */}
+          {/* LEFT COLUMN: Standard Sign In Form (5 Cols)                               */}
+          {/* ========================================================================= */}
+          <div className="lg:col-span-5 p-6 sm:p-8 lg:p-10 flex flex-col justify-between border-b lg:border-b-0 lg:border-r border-emerald-100">
             <div>
-              Don't have an account?{' '}
-              <Link to="/signup" className="font-bold text-emerald-600 hover:text-emerald-700 hover:underline">
-                Create one now
+              {/* Brand Header */}
+              <Link to="/" className="inline-flex items-center gap-2.5 mb-6 group">
+                <div className="w-10 h-10 rounded-xl bg-gradient-to-tr from-emerald-600 to-teal-500 flex items-center justify-center text-white shadow-md shadow-emerald-500/20 group-hover:scale-105 transition-transform">
+                  <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      strokeWidth="2.2"
+                      d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"
+                    />
+                  </svg>
+                </div>
+                <div>
+                  <div className="font-extrabold text-xl tracking-tight text-slate-900 leading-none">
+                    Reserve<span className="text-emerald-600">Pulse</span>
+                  </div>
+                  <div className="text-[10px] text-slate-400 font-medium tracking-wide uppercase mt-0.5">
+                    Orchestration Platform
+                  </div>
+                </div>
+              </Link>
+
+              <h2 className="text-2xl font-extrabold text-slate-900 tracking-tight">
+                Welcome back
+              </h2>
+              <p className="mt-1 text-xs text-slate-500 leading-relaxed">
+                Sign in to manage schedules, catalog services, or inspect bookings.
+              </p>
+
+              {error && (
+                <div className="mt-4 p-3 rounded-xl bg-rose-50 border border-rose-200 text-rose-700 text-xs flex items-start gap-2 animate-in fade-in">
+                  <svg className="w-4 h-4 shrink-0 mt-0.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                  </svg>
+                  <span>{error}</span>
+                </div>
+              )}
+
+              {/* Login Form */}
+              <form onSubmit={handleSubmit} className="mt-6 space-y-4">
+                <Input
+                  label="Email Address"
+                  type="email"
+                  placeholder="name@example.com"
+                  value={email}
+                  onChange={(e) => setEmail(e.target.value)}
+                  required
+                  autoComplete="email"
+                />
+
+                <div className="space-y-1">
+                  <div className="flex items-center justify-between">
+                    <label className="text-xs font-semibold text-slate-700">Password</label>
+                    <span className="text-[10px] text-slate-400">
+                      Default: <code className="bg-emerald-50 text-emerald-800 px-1 py-0.5 rounded border border-emerald-200">Role@123</code>
+                    </span>
+                  </div>
+                  <Input
+                    type="password"
+                    placeholder="••••••••"
+                    value={password}
+                    onChange={(e) => setPassword(e.target.value)}
+                    required
+                    autoComplete="current-password"
+                  />
+                </div>
+
+                <Button
+                  type="submit"
+                  variant="primary"
+                  className="w-full mt-2 py-2.5 font-bold shadow-md shadow-emerald-600/20"
+                  size="md"
+                  isLoading={isSubmitting}
+                  disabled={isSubmitting}
+                >
+                  Sign In to Platform
+                </Button>
+              </form>
+            </div>
+
+            {/* Bottom Links */}
+            <div className="mt-8 pt-5 border-t border-slate-100 flex items-center justify-between text-xs text-slate-500">
+              <div>
+                New to platform?{' '}
+                <Link to="/signup" className="font-bold text-emerald-600 hover:text-emerald-700 hover:underline">
+                  Sign up
+                </Link>
+              </div>
+              <Link to="/" className="text-slate-500 hover:text-emerald-700 font-medium">
+                ← Explore Catalog
               </Link>
             </div>
-            <Link to="/" className="text-slate-500 hover:text-slate-800">
-              ← Back to Catalog
-            </Link>
-          </CardFooter>
-        </Card>
+          </div>
+
+          {/* ========================================================================= */}
+          {/* RIGHT COLUMN: Interactive Demo Personas & Sandbox (7 Cols)                 */}
+          {/* ========================================================================= */}
+          <div className="lg:col-span-7 bg-gradient-to-br from-emerald-50/50 via-slate-50/40 to-emerald-50/30 p-6 sm:p-8 lg:p-10 flex flex-col justify-between">
+            <div>
+              {/* Sandbox Header */}
+              <div className="flex items-center justify-between mb-4 pb-3 border-b border-emerald-100">
+                <div className="flex items-center gap-2">
+                  <span className="flex h-2.5 w-2.5 relative">
+                    <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
+                    <span className="relative inline-flex rounded-full h-2.5 w-2.5 bg-emerald-500"></span>
+                  </span>
+                  <span className="text-xs font-bold uppercase tracking-wider text-slate-800">
+                    Instant Demo Test Personas
+                  </span>
+                </div>
+                <span className="text-[11px] text-emerald-800 font-semibold px-2.5 py-0.5 rounded-full bg-white border border-emerald-200/90 shadow-2xs flex items-center gap-1.5">
+                  <span>🍪</span>
+                  <span>In-Browser Cookie DB</span>
+                </span>
+              </div>
+
+              <p className="text-xs text-slate-500 mb-4">
+                Click <strong>"Fill Form"</strong> to populate fields or <strong>"Login →"</strong> to immediately jump into each role's dashboard:
+              </p>
+
+              {/* Persona Cards List */}
+              <div className="space-y-3">
+                {DEMO_ACCOUNTS.map((acc) => {
+                  const isActive = activePersona === acc.role;
+                  return (
+                    <div
+                      key={acc.role}
+                      className={`rounded-2xl p-4 transition-all duration-200 border bg-white flex flex-col sm:flex-row sm:items-center justify-between gap-3 ${
+                        isActive
+                          ? 'border-emerald-500 ring-2 ring-emerald-500/20 shadow-md shadow-emerald-500/10'
+                          : 'border-emerald-100 hover:border-emerald-300 hover:shadow-sm'
+                      }`}
+                    >
+                      {/* Persona Details */}
+                      <div className="flex items-start gap-3 min-w-0">
+                        <div className="w-10 h-10 rounded-xl bg-emerald-50 border border-emerald-100 text-lg flex items-center justify-center shrink-0">
+                          {acc.icon}
+                        </div>
+                        <div className="min-w-0">
+                          <div className="flex items-center gap-2">
+                            <span className="font-bold text-sm text-slate-900 truncate">
+                              {acc.name}
+                            </span>
+                            <span className="text-[10px] font-semibold text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded-full border border-emerald-200/60">
+                              {acc.badge}
+                            </span>
+                          </div>
+                          <div className="text-xs text-slate-500 font-mono mt-0.5 truncate">
+                            {acc.email}
+                          </div>
+                          <p className="text-[11px] text-slate-500 mt-1 line-clamp-1">
+                            {acc.description}
+                          </p>
+                        </div>
+                      </div>
+
+                      {/* Action Buttons */}
+                      <div className="flex items-center gap-2 shrink-0 self-end sm:self-center">
+                        <button
+                          type="button"
+                          onClick={() => handleAutofill(acc)}
+                          disabled={isSubmitting}
+                          className="px-3 py-1.5 text-xs font-semibold rounded-xl bg-slate-50 border border-slate-200 hover:border-emerald-400 hover:bg-emerald-50 hover:text-emerald-800 active:scale-95 text-slate-700 transition-all cursor-pointer shadow-2xs"
+                        >
+                          Fill Form
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => handleInstantLogin(acc)}
+                          disabled={isSubmitting}
+                          className="px-3.5 py-1.5 text-xs font-bold rounded-xl text-white bg-emerald-600 hover:bg-emerald-700 active:bg-emerald-800 active:scale-95 transition-all cursor-pointer shadow-sm shadow-emerald-600/30 flex items-center gap-1"
+                        >
+                          <span>Login</span>
+                          <span>→</span>
+                        </button>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+
+            {/* Sandbox Footer */}
+            <div className="mt-6 pt-4 border-t border-emerald-100/90 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-2 text-xs text-slate-500">
+              <span className="flex items-center gap-1.5">
+                <span>💾</span>
+                <span>All appointments, services &amp; users persist in browser cookies.</span>
+              </span>
+              <button
+                type="button"
+                onClick={handleResetData}
+                className="text-emerald-700 hover:text-emerald-800 font-semibold underline cursor-pointer shrink-0"
+              >
+                Reset Demo Data
+              </button>
+            </div>
+          </div>
+
+        </div>
       </div>
     </div>
   );
