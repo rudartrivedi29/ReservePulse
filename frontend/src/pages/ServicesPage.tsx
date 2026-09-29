@@ -89,11 +89,12 @@ export const ServicesPage: React.FC = () => {
   const filteredServices = useMemo(() => {
     return services.filter((service) => {
       const matchesCategory =
-        selectedCategory === 'All' || service.category.toLowerCase() === selectedCategory.toLowerCase();
+        selectedCategory === 'All' ||
+        (service.category || '').toLowerCase() === selectedCategory.toLowerCase();
       
       const matchesSearch =
-        service.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        service.description.toLowerCase().includes(searchTerm.toLowerCase());
+        (service.name || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
+        (service.description || '').toLowerCase().includes(searchTerm.toLowerCase());
 
       const isPublished = Boolean(service.isPublished ?? service.isActive);
       const matchesStatus =
@@ -513,16 +514,28 @@ export const ServicesPage: React.FC = () => {
         <EmptyState
           preset="no-results"
           variant="card"
-          title={isOrganiserView ? 'No Services Created Yet' : 'No Matching Services'}
+          title={
+            isOrganiserView
+              ? 'No Services Created Yet'
+              : services.length === 0
+              ? 'No Published Services Available'
+              : 'No Matching Services'
+          }
           description={
             isOrganiserView
               ? 'Get started by creating your first appointment or resource service.'
-              : 'Try adjusting your search criteria or filters to explore available services.'
+              : services.length === 0
+              ? 'There are currently no active public services available in the catalog. Please refresh or check back soon.'
+              : 'Try adjusting your search criteria or category filters to explore available services.'
           }
           action={
             isOrganiserView ? (
               <Button variant="primary" size="sm" onClick={handleOpenCreateModal}>
                 + Create Service
+              </Button>
+            ) : services.length === 0 ? (
+              <Button variant="primary" size="sm" onClick={loadServices}>
+                Refresh Catalog
               </Button>
             ) : (
               <Button

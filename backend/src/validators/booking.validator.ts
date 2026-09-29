@@ -8,8 +8,8 @@ export const bookingAnswerInputSchema = z.object({
 export const createBookingSchema = z.object({
   serviceId: z.string().min(1, 'Service ID is required'),
   resourceId: z.string().min(1, 'Resource / Provider ID is required'),
-  startDateTime: z.string().datetime({ message: 'Valid UTC ISO start datetime is required' }),
-  endDateTime: z.string().datetime({ message: 'Valid UTC ISO end datetime is required' }).optional(),
+  startDateTime: z.string().datetime({ message: 'Valid ISO start datetime is required', offset: true }),
+  endDateTime: z.string().datetime({ message: 'Valid ISO end datetime is required', offset: true }).optional(),
   slotId: z.string().optional(),
   attendeeCount: z.coerce.number().int().positive().default(1),
   customerName: z.string().min(1, 'Customer name is required').max(255).optional(),

@@ -10,8 +10,12 @@ import { AuthUserPayload } from '../middleware/auth.middleware';
 const inMemoryServices: Map<string, ServiceEntity> = new Map();
 
 // Seed initial organiser demo services
-const seedDemoServices = () => {
-  if (inMemoryServices.size > 0) return;
+export const seedDemoServices = (forceReset: boolean = false) => {
+  if (inMemoryServices.size > 0 && !forceReset) {
+    // If services exist, make sure at least the published ones are active
+    const hasActive = Array.from(inMemoryServices.values()).some((s) => s.is_active);
+    if (hasActive) return;
+  }
 
   const demoServices: ServiceEntity[] = [
     {
@@ -63,18 +67,90 @@ const seedDemoServices = () => {
       updated_at: new Date('2026-09-05T12:00:00Z'),
     },
     {
+      id: 'srv_boardroom_004',
+      organiser_id: 'usr_organiser_002',
+      name: 'Executive Boardroom Alpha',
+      slug: 'executive-boardroom-alpha',
+      description: 'Soundproof executive suite with dual 85" 4K displays and Logitech Rally telepresence. Accommodates up to 16 participants.',
+      category: 'Workspace',
+      duration_minutes: 60,
+      buffer_before_minutes: 15,
+      buffer_after_minutes: 15,
+      price_amount: 0.0,
+      price_currency: 'USD',
+      is_active: true,
+      capacity_type: 'group',
+      default_capacity: 16,
+      max_advance_booking_days: 30,
+      min_lead_time_hours: 4,
+      requires_manual_confirmation: false,
+      resource_assignment_mode: 'single_resource',
+      payment_setting: 'free',
+      share_token: 'tok_preview_boardroom_004_live',
+      created_at: new Date('2026-09-06T10:00:00Z'),
+      updated_at: new Date('2026-09-06T10:00:00Z'),
+    },
+    {
+      id: 'srv_advisory_005',
+      organiser_id: 'usr_organiser_002',
+      name: 'Principal Architecture Advisory',
+      slug: 'principal-architecture-advisory',
+      description: 'One-on-one technical deep-dive and high-level architectural review with Principal Systems Architect Jordan Vance.',
+      category: 'Consulting',
+      duration_minutes: 45,
+      buffer_before_minutes: 15,
+      buffer_after_minutes: 15,
+      price_amount: 0.0,
+      price_currency: 'USD',
+      is_active: true,
+      capacity_type: 'individual',
+      default_capacity: 1,
+      max_advance_booking_days: 21,
+      min_lead_time_hours: 6,
+      requires_manual_confirmation: true,
+      resource_assignment_mode: 'single_resource',
+      payment_setting: 'free',
+      share_token: 'tok_preview_advisory_005_live',
+      created_at: new Date('2026-09-07T11:00:00Z'),
+      updated_at: new Date('2026-09-07T11:00:00Z'),
+    },
+    {
+      id: 'srv_workshop_006',
+      organiser_id: 'usr_organiser_002',
+      name: 'AI Model Training & Benchmark Pod',
+      slug: 'ai-model-training-benchmark-pod',
+      description: 'Dedicated multi-GPU cluster allocation for distributed fine-tuning, parameter-efficient adaptation (LoRA), and model evaluation.',
+      category: 'Compute',
+      duration_minutes: 120,
+      buffer_before_minutes: 15,
+      buffer_after_minutes: 30,
+      price_amount: 0.0,
+      price_currency: 'USD',
+      is_active: true,
+      capacity_type: 'resource_constrained',
+      default_capacity: 8,
+      max_advance_booking_days: 45,
+      min_lead_time_hours: 4,
+      requires_manual_confirmation: false,
+      resource_assignment_mode: 'automatic',
+      payment_setting: 'free',
+      share_token: 'tok_preview_workshop_006_live',
+      created_at: new Date('2026-09-08T09:00:00Z'),
+      updated_at: new Date('2026-09-08T09:00:00Z'),
+    },
+    {
       id: 'srv_quantum_003',
       organiser_id: 'usr_organiser_002',
-      name: 'Quantum Algorithm Simulation Pod (Draft)',
+      name: 'Quantum Algorithm Simulation Pod',
       slug: 'quantum-algorithm-simulation-pod',
-      description: 'Pre-release experimental quantum compute emulator access with senior quantum engineering assistance. Confidential access only.',
+      description: 'High-performance quantum circuit simulation environment with Qiskit and Cirq runtime integration. Specialized quantum engineering support.',
       category: 'Research',
       duration_minutes: 90,
       buffer_before_minutes: 30,
       buffer_after_minutes: 30,
       price_amount: 0.0,
       price_currency: 'USD',
-      is_active: false, // Draft / Unpublished
+      is_active: true,
       capacity_type: 'group',
       default_capacity: 6,
       max_advance_booking_days: 60,
@@ -82,7 +158,7 @@ const seedDemoServices = () => {
       requires_manual_confirmation: true,
       resource_assignment_mode: 'manual',
       payment_setting: 'free',
-      share_token: 'secret_share_preview_draft_quantum_777', // Secret share link for preview
+      share_token: 'secret_share_preview_draft_quantum_777',
       created_at: new Date('2026-09-10T08:00:00Z'),
       updated_at: new Date('2026-09-10T08:00:00Z'),
     },
@@ -232,7 +308,11 @@ export class ServiceService {
     }
 
     // In-memory fallback
-    const list = Array.from(inMemoryServices.values()).filter((s) => s.is_active);
+    let list = Array.from(inMemoryServices.values()).filter((s) => s.is_active);
+    if (list.length === 0) {
+      seedDemoServices(true);
+      list = Array.from(inMemoryServices.values()).filter((s) => s.is_active);
+    }
     return list.map(this.formatService);
   }
 

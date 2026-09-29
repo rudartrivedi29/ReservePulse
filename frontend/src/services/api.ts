@@ -15,7 +15,7 @@ export class ApiError extends Error {
   }
 }
 
-const getHeaders = (customHeaders?: HeadersInit): HeadersInit => {
+const getHeaders = (customHeaders?: HeadersInit): Record<string, string> => {
   const token = localStorage.getItem('reservepulse_token');
   const headers: Record<string, string> = {
     'Content-Type': 'application/json',
@@ -24,7 +24,20 @@ const getHeaders = (customHeaders?: HeadersInit): HeadersInit => {
   if (token) {
     headers['Authorization'] = `Bearer ${token}`;
   }
-  return { ...headers, ...customHeaders };
+  if (customHeaders) {
+    if (customHeaders instanceof Headers) {
+      customHeaders.forEach((value, key) => {
+        headers[key] = value;
+      });
+    } else if (Array.isArray(customHeaders)) {
+      customHeaders.forEach(([key, value]) => {
+        headers[key] = value;
+      });
+    } else if (typeof customHeaders === 'object') {
+      Object.assign(headers, customHeaders);
+    }
+  }
+  return headers;
 };
 
 const parseResponseBody = async (response: Response): Promise<any> => {
@@ -61,10 +74,11 @@ export const apiClient = {
   async get<T>(endpoint: string, options?: RequestInit): Promise<ApiResponse<T>> {
     const url = `${API_BASE_URL}${endpoint}`;
     try {
+      const { headers: customHeaders, ...restOptions } = options || {};
       const response = await fetch(url, {
         method: 'GET',
-        headers: getHeaders(options?.headers),
-        ...options,
+        ...restOptions,
+        headers: getHeaders(customHeaders),
       });
 
       const data = await parseResponseBody(response);
@@ -91,11 +105,12 @@ export const apiClient = {
   async post<T>(endpoint: string, body?: unknown, options?: RequestInit): Promise<ApiResponse<T>> {
     const url = `${API_BASE_URL}${endpoint}`;
     try {
+      const { headers: customHeaders, ...restOptions } = options || {};
       const response = await fetch(url, {
         method: 'POST',
-        headers: getHeaders(options?.headers),
+        ...restOptions,
+        headers: getHeaders(customHeaders),
         body: body !== undefined ? JSON.stringify(body) : undefined,
-        ...options,
       });
 
       const data = await parseResponseBody(response);
@@ -122,11 +137,12 @@ export const apiClient = {
   async put<T>(endpoint: string, body?: unknown, options?: RequestInit): Promise<ApiResponse<T>> {
     const url = `${API_BASE_URL}${endpoint}`;
     try {
+      const { headers: customHeaders, ...restOptions } = options || {};
       const response = await fetch(url, {
         method: 'PUT',
-        headers: getHeaders(options?.headers),
+        ...restOptions,
+        headers: getHeaders(customHeaders),
         body: body !== undefined ? JSON.stringify(body) : undefined,
-        ...options,
       });
 
       const data = await parseResponseBody(response);
@@ -153,11 +169,12 @@ export const apiClient = {
   async patch<T>(endpoint: string, body?: unknown, options?: RequestInit): Promise<ApiResponse<T>> {
     const url = `${API_BASE_URL}${endpoint}`;
     try {
+      const { headers: customHeaders, ...restOptions } = options || {};
       const response = await fetch(url, {
         method: 'PATCH',
-        headers: getHeaders(options?.headers),
+        ...restOptions,
+        headers: getHeaders(customHeaders),
         body: body !== undefined ? JSON.stringify(body) : undefined,
-        ...options,
       });
 
       const data = await parseResponseBody(response);
@@ -184,10 +201,11 @@ export const apiClient = {
   async delete<T>(endpoint: string, options?: RequestInit): Promise<ApiResponse<T>> {
     const url = `${API_BASE_URL}${endpoint}`;
     try {
+      const { headers: customHeaders, ...restOptions } = options || {};
       const response = await fetch(url, {
         method: 'DELETE',
-        headers: getHeaders(options?.headers),
-        ...options,
+        ...restOptions,
+        headers: getHeaders(customHeaders),
       });
 
       const data = await parseResponseBody(response);

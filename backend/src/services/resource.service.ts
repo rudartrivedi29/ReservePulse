@@ -114,6 +114,38 @@ const seedDemoResources = () => {
       allocation_quantity: 1,
       created_at: new Date('2026-09-01T10:00:00Z'),
     },
+    {
+      id: 'sr_004',
+      service_id: 'srv_boardroom_004',
+      resource_id: 'res_boardroom_alpha',
+      is_required: true,
+      allocation_quantity: 1,
+      created_at: new Date('2026-09-01T10:00:00Z'),
+    },
+    {
+      id: 'sr_005',
+      service_id: 'srv_advisory_005',
+      resource_id: 'res_staff_jordan',
+      is_required: true,
+      allocation_quantity: 1,
+      created_at: new Date('2026-09-01T10:00:00Z'),
+    },
+    {
+      id: 'sr_006',
+      service_id: 'srv_workshop_006',
+      resource_id: 'res_h100_node1',
+      is_required: true,
+      allocation_quantity: 1,
+      created_at: new Date('2026-09-01T10:00:00Z'),
+    },
+    {
+      id: 'sr_007',
+      service_id: 'srv_quantum_003',
+      resource_id: 'res_h100_node1',
+      is_required: true,
+      allocation_quantity: 1,
+      created_at: new Date('2026-09-01T10:00:00Z'),
+    },
   ];
 
   demoBindings.forEach((binding) => inMemoryServiceResources.set(binding.id, binding));
