@@ -10,7 +10,7 @@
 import type { UserProfile } from '../context/AuthTypes';
 import type { ServiceItem, CreateServicePayload } from '../services/service.service';
 import type { ResourceItem, CreateResourcePayload } from '../services/resource.service';
-import type { BookingItem, CreateBookingPayload, ServiceAvailabilityData, ServiceQuestionItem } from '../services/booking.service';
+import type { BookingItem, CreateBookingPayload, ServiceAvailabilityData, ServiceQuestionItem, BookableSlot } from '../services/booking.service';
 import type { AdminUserItem, AdminDashboardStats } from '../services/admin.service';
 import type { AnalyticsOverviewResult } from '../services/analytics.service';
 import type { AuthSessionData } from '../services/auth.service';
@@ -921,11 +921,13 @@ class CookieDatabase {
         return JSON.parse(cookieUser);
       } catch {}
     }
-    const localUser = localStorage.getItem('reservepulse_user');
-    if (localUser) {
-      try {
-        return JSON.parse(localUser);
-      } catch {}
+    if (typeof localStorage !== 'undefined') {
+      const localUser = localStorage.getItem('reservepulse_user');
+      if (localUser) {
+        try {
+          return JSON.parse(localUser);
+        } catch {}
+      }
     }
     return null;
   }
@@ -1095,21 +1097,79 @@ class CookieDatabase {
   // Availability Generation Engine
   // --------------------------------------------------------------------------
 
-  public getAvailability(serviceId: string, startDate?: string, endDate?: string): ServiceAvailabilityData {
+  public getAvailability(
+    serviceId: string,
+    startDate?: string,
+    endDate?: string,
+    requestedResourceId?: string,
+    attendees: number = 1,
+    slotStepMinutes?: number
+  ): ServiceAvailabilityData {
     const service = this.getServiceByIdOrSlug(serviceId);
     if (!service) throw new Error('Service not found');
 
-    const resource = this.state.resources[0];
+    let resource = requestedResourceId
+      ? this.getResourceById(requestedResourceId)
+      : null;
+
+    if (!resource) {
+      resource =
+        this.state.resources.find(
+          (r) => r.status === 'operational' || r.status === 'active'
+        ) || this.state.resources[0];
+    }
+
+    const parseDateOnly = (str?: string): Date => {
+      if (!str) return new Date();
+      const parts = str.split('-').map(Number);
+      if (parts.length === 3 && !isNaN(parts[0]) && !isNaN(parts[1]) && !isNaN(parts[2])) {
+        return new Date(parts[0], parts[1] - 1, parts[2], 0, 0, 0, 0);
+      }
+      const d = new Date(str);
+      return isNaN(d.getTime()) ? new Date() : new Date(d.getFullYear(), d.getMonth(), d.getDate(), 0, 0, 0, 0);
+    };
+
+    const formatDateOnly = (d: Date): string => {
+      const y = d.getFullYear();
+      const m = String(d.getMonth() + 1).padStart(2, '0');
+      const day = String(d.getDate()).padStart(2, '0');
+      return `${y}-${m}-${day}`;
+    };
+
+    const startD = parseDateOnly(startDate);
+    const endD = endDate ? parseDateOnly(endDate) : new Date(startD);
+
+    const diffDays = Math.max(0, Math.round((endD.getTime() - startD.getTime()) / (1000 * 60 * 60 * 24)));
+    const totalDaysToGen = Math.min(diffDays + 1, 30);
+
+    const duration = service.durationMinutes || 60;
+    const stepSize = slotStepMinutes && slotStepMinutes > 0 ? slotStepMinutes : duration;
+
+    // Working interval times (09:00 - 18:00)
+    const generateDayTimes = (step: number): string[] => {
+      const result: string[] = [];
+      const startMin = 9 * 60; // 09:00
+      const endMin = 18 * 60; // 18:00
+      for (let min = startMin; min + duration <= endMin; min += Math.max(step, 30)) {
+        const h = Math.floor(min / 60);
+        const m = min % 60;
+        result.push(`${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}`);
+      }
+      return result.length > 0 ? result : ['09:00', '10:30', '12:00', '13:30', '15:00', '16:30'];
+    };
+
+    const times = generateDayTimes(stepSize);
+    const now = new Date();
+    const todayStr = formatDateOnly(now);
     const days = [];
-    const baseDate = startDate ? new Date(startDate) : new Date();
 
-    for (let dayOffset = 0; dayOffset < 7; dayOffset++) {
-      const currentDay = new Date(baseDate);
-      currentDay.setDate(currentDay.getDate() + dayOffset);
-      const dateStr = currentDay.toISOString().split('T')[0];
+    for (let dayOffset = 0; dayOffset < totalDaysToGen; dayOffset++) {
+      const currentDay = new Date(startD);
+      currentDay.setDate(startD.getDate() + dayOffset);
+      const dateStr = formatDateOnly(currentDay);
+      const isToday = dateStr === todayStr;
 
-      const slots = [];
-      const times = ['09:00', '10:30', '12:00', '13:30', '15:00', '16:30'];
+      const slots: BookableSlot[] = [];
 
       for (let i = 0; i < times.length; i++) {
         const time = times[i];
@@ -1118,7 +1178,7 @@ class CookieDatabase {
         const slotStart = new Date(currentDay);
         slotStart.setHours(hours, minutes, 0, 0);
 
-        const slotEnd = new Date(slotStart.getTime() + (service.durationMinutes || 60) * 60000);
+        const slotEnd = new Date(slotStart.getTime() + duration * 60000);
         const endHours = String(slotEnd.getHours()).padStart(2, '0');
         const endMinutes = String(slotEnd.getMinutes()).padStart(2, '0');
         const endTime = `${endHours}:${endMinutes}`;
@@ -1126,10 +1186,18 @@ class CookieDatabase {
         // Check if any existing booking overlaps
         const isBooked = this.state.bookings.some(
           (b) =>
-            b.serviceId === service.id &&
+            (b.serviceId === service.id || (resource && b.resourceId === resource.id)) &&
             b.status !== 'cancelled' &&
-            Math.abs(new Date(b.startTime).getTime() - slotStart.getTime()) < 1800000
+            Math.abs(new Date(b.startTime).getTime() - slotStart.getTime()) < duration * 60000
         );
+
+        const maxCap = service.defaultCapacity || 1;
+        const bookedCap = isBooked ? maxCap : 0;
+        const remainingCap = Math.max(0, maxCap - bookedCap);
+        
+        // Slot is past only if the date is today (or past) and slot start has elapsed
+        const isPast = slotStart.getTime() <= now.getTime();
+        const isBookable = !isBooked && !isPast && remainingCap >= attendees;
 
         slots.push({
           id: `slot_${service.id}_${dateStr}_${time.replace(':', '')}`,
@@ -1142,22 +1210,58 @@ class CookieDatabase {
           endTime,
           startDateTime: slotStart.toISOString(),
           endDateTime: slotEnd.toISOString(),
-          durationMinutes: service.durationMinutes,
-          maxCapacity: service.defaultCapacity,
-          bookedCapacity: isBooked ? service.defaultCapacity : 0,
-          remainingCapacity: isBooked ? 0 : service.defaultCapacity,
-          isBookable: !isBooked,
-          status: (isBooked ? 'booked' : 'available') as any,
+          durationMinutes: duration,
+          maxCapacity: maxCap,
+          bookedCapacity: bookedCap,
+          remainingCapacity: remainingCap,
+          isBookable,
+          status: isBookable ? 'available' : isBooked ? 'booked' : 'unavailable',
         });
       }
+
+      // If today is chosen and all normal business slots are past, add available evening demo slots
+      if (isToday && !slots.some((s) => s.isBookable)) {
+        const eveningHours = [Math.max(now.getHours() + 1, 19), Math.max(now.getHours() + 2, 20)];
+        for (const eh of eveningHours) {
+          if (eh <= 23) {
+            const time = `${String(eh).padStart(2, '0')}:00`;
+            const slotStart = new Date(currentDay);
+            slotStart.setHours(eh, 0, 0, 0);
+            const slotEnd = new Date(slotStart.getTime() + duration * 60000);
+            const endHours = String(slotEnd.getHours()).padStart(2, '0');
+            const endMinutes = String(slotEnd.getMinutes()).padStart(2, '0');
+            const endTime = `${endHours}:${endMinutes}`;
+            slots.push({
+              id: `slot_${service.id}_${dateStr}_${time.replace(':', '')}`,
+              serviceId: service.id,
+              resourceId: resource?.id || 'res_default',
+              resourceName: resource?.name || 'Primary Allocation Node',
+              resourceType: resource?.resourceType || 'room',
+              date: dateStr,
+              startTime: time,
+              endTime,
+              startDateTime: slotStart.toISOString(),
+              endDateTime: slotEnd.toISOString(),
+              durationMinutes: duration,
+              maxCapacity: service.defaultCapacity || 1,
+              bookedCapacity: 0,
+              remainingCapacity: service.defaultCapacity || 1,
+              isBookable: true,
+              status: 'available',
+            });
+          }
+        }
+      }
+
+      const bookableSlots = slots.filter((s) => s.isBookable);
 
       days.push({
         date: dateStr,
         dayOfWeek: currentDay.getDay(),
         dayName: currentDay.toLocaleDateString('en-US', { weekday: 'short' }),
-        hasAvailability: slots.some((s) => s.isBookable),
-        totalSlotsCount: slots.length,
-        slots,
+        hasAvailability: bookableSlots.length > 0,
+        totalSlotsCount: bookableSlots.length,
+        slots: bookableSlots,
       });
     }
 
@@ -1175,11 +1279,14 @@ class CookieDatabase {
         maxAdvanceBookingDays: service.maxAdvanceBookingDays,
       },
       query: {
-        startDate: startDate || new Date().toISOString().split('T')[0],
-        endDate: endDate || new Date(Date.now() + 7 * 86400000).toISOString().split('T')[0],
-        attendeeCount: 1,
+        startDate: startDate || formatDateOnly(now),
+        endDate: endDate || formatDateOnly(new Date(now.getTime() + 7 * 86400000)),
+        attendeeCount: attendees,
       },
-      totalBookableSlots: days.reduce((acc, d) => acc + d.slots.filter((s) => s.isBookable).length, 0),
+      totalBookableSlots: days.reduce(
+        (acc, d) => acc + d.slots.length,
+        0
+      ),
       days,
     };
   }

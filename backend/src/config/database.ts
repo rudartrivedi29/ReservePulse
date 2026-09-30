@@ -35,11 +35,21 @@ class DatabaseManager {
 
   private initPool(): void {
     try {
+      const isRemote =
+        !config.database.url.includes('localhost') &&
+        !config.database.url.includes('127.0.0.1');
+      const requiresSsl =
+        isRemote &&
+        (config.isProduction ||
+          config.database.url.includes('sslmode=require') ||
+          process.env.DATABASE_SSL === 'true');
+
       this.pool = new Pool({
         connectionString: config.database.url,
         max: config.database.poolMax,
         idleTimeoutMillis: config.database.idleTimeoutMs,
         connectionTimeoutMillis: config.database.connectionTimeoutMs,
+        ...(requiresSsl ? { ssl: { rejectUnauthorized: false } } : {}),
       });
 
       this.pool.on('error', (err: Error) => {

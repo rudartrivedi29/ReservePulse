@@ -78,10 +78,19 @@ export const BookingWizard: React.FC<BookingWizardProps> = ({
   const [selectedResource, setSelectedResource] = useState<ResourceItem | null>(null); // null = "Any available"
   const [isLoadingResources, setIsLoadingResources] = useState(false);
 
+  // Helper to format local date without UTC shift
+  const formatLocalDate = (d: Date): string => {
+    const year = d.getFullYear();
+    const month = String(d.getMonth() + 1).padStart(2, '0');
+    const day = String(d.getDate()).padStart(2, '0');
+    return `${year}-${month}-${day}`;
+  };
+
   // Step 3 & 4: Date & Real-time Slots selection
   const [selectedDate, setSelectedDate] = useState<Date>(() => {
     const d = new Date();
     d.setDate(d.getDate() + 1); // Default to tomorrow
+    d.setHours(0, 0, 0, 0);
     return d;
   });
   const [availableSlots, setAvailableSlots] = useState<BookableSlot[]>([]);
@@ -216,7 +225,7 @@ export const BookingWizard: React.FC<BookingWizardProps> = ({
         setIsSilentRefreshing(true);
       }
 
-      const dateStr = selectedDate.toISOString().split('T')[0];
+      const dateStr = formatLocalDate(selectedDate);
 
       try {
         const res = await bookingClient.getServiceAvailability(selectedService.id, {
@@ -226,8 +235,9 @@ export const BookingWizard: React.FC<BookingWizardProps> = ({
           attendees: attendeeCountRef.current,
         });
 
-        const daySlots =
-          res.data && res.data.days && res.data.days.length > 0 ? res.data.days[0].slots || [] : [];
+        const matchingDay =
+          res.data?.days?.find((d) => d.date === dateStr) || res.data?.days?.[0];
+        const daySlots = matchingDay?.slots || [];
         setAvailableSlots(daySlots);
         setLastRefreshedAt(new Date());
 
@@ -327,13 +337,11 @@ export const BookingWizard: React.FC<BookingWizardProps> = ({
       setCurrentStep(2);
     } else if (currentStep === 2) {
       setCurrentStep(3);
-    } else if (currentStep === 3) {
+    } else if (currentStep === 3 || currentStep === 4) {
       if (!selectedDate) {
         toast.error('Date Required', 'Please choose an appointment date on the calendar.');
         return;
       }
-      setCurrentStep(4);
-    } else if (currentStep === 4) {
       if (!selectedSlot) {
         toast.error('Slot Required', 'Please select an available appointment time slot.');
         return;
@@ -1010,7 +1018,7 @@ export const BookingWizard: React.FC<BookingWizardProps> = ({
                           {slotFetchError}
                         </div>
                       ) : availableSlots.length === 0 ? (
-                        <div className="py-12 text-center space-y-2">
+                        <div className="py-12 text-center space-y-3">
                           <div className="w-10 h-10 rounded-full bg-slate-100 text-slate-400 flex items-center justify-center mx-auto">
                             <Clock className="w-5 h-5" />
                           </div>
@@ -1021,6 +1029,21 @@ export const BookingWizard: React.FC<BookingWizardProps> = ({
                             Operating hours, lead-time rules, or existing bookings prevent slot emission.
                             Please choose another date on the calendar.
                           </p>
+                          <div className="pt-1">
+                            <Button
+                              variant="outline"
+                              size="xs"
+                              className="text-xs bg-indigo-50 border-indigo-200 text-indigo-700 hover:bg-indigo-100"
+                              onClick={() => {
+                                const tomorrow = new Date();
+                                tomorrow.setDate(tomorrow.getDate() + 1);
+                                tomorrow.setHours(0, 0, 0, 0);
+                                setSelectedDate(tomorrow);
+                              }}
+                            >
+                              Check Tomorrow&apos;s Availability &rarr;
+                            </Button>
+                          </div>
                         </div>
                       ) : (
                         <div className="space-y-2 max-h-[320px] overflow-y-auto pr-1">

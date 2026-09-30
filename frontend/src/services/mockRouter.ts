@@ -129,13 +129,65 @@ export async function handleClientMockRequest<T>(
     return ok(service as any);
   }
 
-  const serviceAvailabilityMatch = path.match(/^\/services\/([^/]+)\/availability$/);
+  // Availability Endpoints: Supports /services/:serviceId/availability and /availability/services/:serviceId
+  const serviceAvailabilityMatch =
+    path.match(/^(?:\/api\/v1)?\/services\/([^/]+)\/availability\/?$/) ||
+    path.match(/^(?:\/api\/v1)?\/availability\/services\/([^/]+)\/?$/);
   if (serviceAvailabilityMatch) {
-    const serviceId = serviceAvailabilityMatch[1];
+    const serviceId = serviceAvailabilityMatch[1] || serviceAvailabilityMatch[2];
     const start = searchParams.get('startDate') || undefined;
     const end = searchParams.get('endDate') || undefined;
-    const avail = cookieDb.getAvailability(serviceId, start, end);
+    const resourceId = searchParams.get('resourceId') || undefined;
+    const attendees = Number(searchParams.get('attendees')) || 1;
+    const slotStep = Number(searchParams.get('slotStep')) || undefined;
+    const avail = cookieDb.getAvailability(serviceId, start, end, resourceId, attendees, slotStep);
     return ok(avail as any);
+  }
+
+  // Schedule Normalized Availability for Calendar inspector
+  const scheduleResourceAvailMatch = path.match(/^(?:\/api\/v1)?\/schedules\/resources\/([^/]+)\/availability\/?$/);
+  if (scheduleResourceAvailMatch) {
+    const resourceId = scheduleResourceAvailMatch[1];
+    const start = searchParams.get('startDate') || new Date().toISOString().split('T')[0];
+    const end = searchParams.get('endDate') || start;
+    const resource = cookieDb.getResourceById(resourceId) || cookieDb.getResources()[0];
+    const days: any[] = [];
+    const [sy, sm, sd] = start.split('-').map(Number);
+    const [ey, em, ed] = end.split('-').map(Number);
+    const startD = new Date(sy || 2026, (sm || 1) - 1, sd || 1);
+    const endD = new Date(ey || 2026, (em || 1) - 1, ed || 1);
+    const cur = new Date(startD);
+    while (cur <= endD) {
+      const cy = cur.getFullYear();
+      const cm = String(cur.getMonth() + 1).padStart(2, '0');
+      const cday = String(cur.getDate()).padStart(2, '0');
+      const dStr = `${cy}-${cm}-${cday}`;
+      const dow = cur.getDay();
+      const isWeekday = dow >= 1 && dow <= 5;
+      days.push({
+        date: dStr,
+        dayOfWeek: dow,
+        dayName: ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'][dow],
+        isAvailable: isWeekday,
+        workingIntervals: isWeekday ? [{
+          startTime: '09:00',
+          endTime: '17:00',
+          startMinutes: 540,
+          endMinutes: 1020,
+          durationMinutes: 480,
+        }] : [],
+      });
+      cur.setDate(cur.getDate() + 1);
+    }
+    return ok({
+      resourceId,
+      resourceName: resource?.name || 'Resource',
+      resourceType: resource?.resourceType || 'room',
+      capacity: resource?.capacity || 1,
+      startDate: start,
+      endDate: end,
+      days,
+    } as any);
   }
 
   const serviceQuestionsMatch = path.match(/^\/services\/([^/]+)\/questions$/);
